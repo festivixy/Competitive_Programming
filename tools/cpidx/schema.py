@@ -77,6 +77,7 @@ ORIGINS = frozenset("""
     codeforces atcoder topcoder codechef leetcode
     gcj kickstart meta-hacker-cup
     projecteuler library-checker cses
+    joi izho rmi balkanoi coi ejoi sgnoi info1cup loi innopolis koi
     """.split())
 
 HOSTS = frozenset("""
@@ -140,6 +141,53 @@ CCC_TIER = {
 CCO_TIER = {"1": 6, "2": 8, "3": 8, "4": 6, "5": 8, "6": 8}
 USACO_TIER = {"Bronze": 2, "Silver": 4, "Gold": 6, "Platinum": 8}
 IOI_TIER = {"1": 6, "2": 8, "3": 8}
+
+# CSES publishes no difficulty, but its sections are ordered pedagogically.
+# Midpoints, used only as an `estimated` seed.
+CSES_SECTION_TIER = {
+    "Introductory Problems": 2,
+    "Sorting and Searching": 3,
+    "Dynamic Programming": 4,
+    "Graph Algorithms": 4,
+    "Tree Algorithms": 4,
+    "Range Queries": 5,
+    "Mathematics": 5,
+    "String Algorithms": 5,
+    "Geometry": 5,
+    "Bitwise Operations": 5,
+    "Construction Problems": 5,
+    "Sliding Window Problems": 4,
+    "Interactive Problems": 5,
+    "Counting Problems": 6,
+    "Advanced Techniques": 7,
+    "Advanced Graph Problems": 6,
+    "Additional Problems I": 6,
+    "Additional Problems II": 7,
+}
+
+# oj.uz-hosted olympiads, by how hard the contest runs overall. SPEC.md 6.2
+# anchors IOI/APIO/CEOI at 6-10; the junior and national events sit lower.
+OJUZ_TIER = {
+    "ioi": 7,
+    "apio": 7,
+    "ceoi": 7,
+    "balkanoi": 6,
+    "boi": 6,
+    "joi": 6,
+    "poi": 6,
+    "coci": 4,
+    "coi": 6,
+    "izho": 7,
+    "rmi": 7,
+    "egoi": 6,
+    "ejoi": 4,
+    "sgnoi": 5,
+    "info1cup": 5,
+    "inoi": 5,
+    "loi": 5,
+    "innopolis": 5,
+    "koi": 5,
+}
 
 MIN_YEAR = 1990
 MAX_TAG_DEPTH = 4

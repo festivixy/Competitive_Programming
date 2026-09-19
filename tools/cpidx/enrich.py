@@ -343,7 +343,7 @@ OJUZ_SLUG = re.compile(r"oj\.uz/problem/view/([A-Za-z]+)(\d{2})_([A-Za-z0-9]+)")
 # usaco.guide spells its IOI ids three different ways -- `ioi-11-crocodile`,
 # `IOI11_garden`, `ioi-phidias` -- so they are indexed by (two-digit year,
 # name) with a name-only fallback rather than matched literally.
-GUIDE_ALT_ID = re.compile(r"^(?:ioi|other)[-_]?(\d{2})?[-_]([a-z0-9]+)$", re.I)
+GUIDE_ALT_ID = re.compile(r"^([a-z]+)[-_]?(\d{2,4})?[-_]?([a-z0-9]+)$", re.I)
 
 
 def guide_alt_index(guide: dict[str, dict]) -> dict[tuple[str, str], dict]:
@@ -353,8 +353,8 @@ def guide_alt_index(guide: dict[str, dict]) -> dict[tuple[str, str], dict]:
         match = GUIDE_ALT_ID.match(uid)
         if not match:
             continue
-        year = match.group(1) or ""
-        name = match.group(2).lower()
+        year = (match.group(2) or "")[-2:]
+        name = match.group(3).lower()
         index.setdefault((year, name), record)
         index.setdefault(("", name), record)
     return index
@@ -426,7 +426,12 @@ def apply(
             out.append(row)
             continue
 
-        tag = guide_tag_for(row, guide) or guide_tag_for_ojuz(row, alt)
+        direct = guide.get(row["id"])
+        tag = (
+            (_tag_from_record(direct) if isinstance(direct, dict) else None)
+            or guide_tag_for(row, guide)
+            or guide_tag_for_ojuz(row, alt)
+        )
         source = PROVENANCE_GUIDE
         if not tag:
             tag = dmoj_tag_for(row)

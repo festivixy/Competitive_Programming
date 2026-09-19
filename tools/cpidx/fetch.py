@@ -23,7 +23,7 @@ import urllib.request
 from collections.abc import Callable, Iterator
 
 from . import csvio
-from .schema import CCC_TIER, CCO_TIER, USACO_TIER
+from .schema import CCC_TIER, CCO_TIER, CSES_SECTION_TIER, OJUZ_TIER, USACO_TIER
 
 USER_AGENT = "cpidx-fetch/0.1"
 DMOJ_PAGES = 8
@@ -186,53 +186,142 @@ def usaco_rows(today: str, pause: float = 0.12, log: Callable[[str], None] | Non
     return list(seen.values())
 
 
-# --- IOI, via oj.uz ----------------------------------------------------------
-OJUZ_IOI_INDEX = "https://oj.uz/problems/source/ioi"
-OJUZ_YEAR = re.compile(r'href="/problems/source/ioi(\d{4})"')
+# --- oj.uz-hosted olympiads ---------------------------------------------------
+OJUZ_SOURCE_INDEX = "https://oj.uz/problems/source/{source}"
+OJUZ_YEAR = re.compile(r'href="/problems/source/([a-z0-9]+)(\d{4})"')
 OJUZ_PROBLEM = re.compile(r'href="/problem/view/([A-Za-z0-9_]+)"[^>]*>([^<]+)<')
+
+# oj.uz also mirrors CCO, which DMOJ already supplies with contest positions
+# in the id; fetching both would double every CCO row under two schemes.
+OJUZ_SOURCES = tuple(sorted(set(OJUZ_TIER)))
+
+CONTEST_NAME = {
+    "ioi": "IOI",
+    "apio": "APIO",
+    "ceoi": "CEOI",
+    "balkanoi": "Balkan OI",
+    "boi": "BOI",
+    "joi": "JOI",
+    "poi": "POI",
+    "coci": "COCI",
+    "coi": "COI",
+    "izho": "IZhO",
+    "rmi": "RMI",
+    "egoi": "EGOI",
+    "ejoi": "EJOI",
+    "sgnoi": "SGNOI",
+    "info1cup": "info(1) cup",
+    "inoi": "INOI",
+    "loi": "LOI",
+    "innopolis": "Innopolis Open",
+    "koi": "KOI",
+}
+
+
+def ojuz_rows(
+    source: str, today: str, pause: float = 0.1, log: Callable[[str], None] | None = None
+):
+    """Every problem oj.uz hosts for one olympiad.
+
+    Sources nest to varying depths: IOI lists years directly, JOI lists
+    `joisc` / `joifinal` first, and POI and COCI list two-year seasons
+    (`coci20142015`). So this walks children until it reaches problem links,
+    taking the year from the first four digits of the deepest slug.
+    """
+    rows: list[dict] = []
+    seen_pages: set[str] = set()
+    seen_ids: set[str] = set()
+
+    def walk(slug: str, depth: int) -> None:
+        if slug in seen_pages or depth > 3:
+            return
+        seen_pages.add(slug)
+        body = _get(OJUZ_SOURCE_INDEX.format(source=slug))
+        time.sleep(pause)
+
+        found = OJUZ_PROBLEM.findall(body)
+        if found:
+            year_match = re.search(r"(\d{4})", slug)
+            year = year_match.group(1) if year_match else ""
+            for problem_slug, raw_name in found:
+                tail = problem_slug.split("_", 1)[-1].lower()
+                name = re.sub(r"[^a-z0-9]+", "", tail)
+                if not name:
+                    continue
+                problem_id = f"{source}-{year}-{name}" if year else f"{source}-{name}"
+                if problem_id in seen_ids:
+                    continue
+                seen_ids.add(problem_id)
+                rows.append(
+                    csvio.blank_problem(
+                        id=problem_id,
+                        title=html.unescape(raw_name).strip(),
+                        origin=source,
+                        contest=(f"{CONTEST_NAME.get(source, source.upper())} {year}".strip()),
+                        year=year,
+                        hosts="oj.uz",
+                        url=f"https://oj.uz/problem/view/{problem_slug}",
+                        # Olympiad tasks are scored by subtask.
+                        format="subtask",
+                        difficulty=str(OJUZ_TIER.get(source, "")),
+                        difficulty_basis="estimated",
+                        added=today,
+                        verified=today,
+                    )
+                )
+            return
+
+        for child in sorted(set(re.findall(r'href="/problems/source/([a-z0-9]+)"', body))):
+            if child != slug and child.startswith(source[:3]):
+                walk(child, depth + 1)
+
+    walk(source, 0)
+    if log:
+        log(f"  {source}: {len(rows)} problems")
+    return rows
 
 
 def ioi_rows(today: str, pause: float = 0.12, log: Callable[[str], None] | None = None):
-    """Every IOI problem oj.uz hosts, walked year by year.
+    """Kept as a named entry point; IOI is one oj.uz source among many."""
+    return ojuz_rows("ioi", today, pause=pause, log=log)
 
-    oj.uz is the only complete public mirror. It reaches back to 2003; earlier
-    IOIs are not hosted anywhere machine-readable.
-    """
-    index = _get(OJUZ_IOI_INDEX)
-    years = sorted(set(OJUZ_YEAR.findall(index)))
-    if log:
-        log(f"  {len(years)} IOI years listed")
+
+# --- CSES ---------------------------------------------------------------------
+CSES_TASK = re.compile(r'<h2>([^<]+)</h2>|<a href="/problemset/task/(\d+)">([^<]+)</a>')
+
+
+def cses_rows(today: str, log: Callable[[str], None] | None = None):
+    """The whole CSES problem set, section by section."""
+    body = _get("https://cses.fi/problemset/")
+    section = ""
     rows = []
-    for year in years:
-        body = _get(f"https://oj.uz/problems/source/ioi{year}")
-        for slug, raw_name in OJUZ_PROBLEM.findall(body):
-            name = html.unescape(raw_name).strip()
-            tail = slug.split("_", 1)[-1].lower()
-            rows.append(
-                csvio.blank_problem(
-                    id=f"ioi-{year}-{re.sub(r'[^a-z0-9]+', '', tail)}",
-                    title=name,
-                    origin="ioi",
-                    contest=f"IOI {year}",
-                    year=year,
-                    hosts="oj.uz",
-                    url=f"https://oj.uz/problem/view/{slug}",
-                    # Every IOI task is scored by subtask.
-                    format="subtask",
-                    # SPEC.md 6.2 puts IOI tasks at 6-10; the slug does not say
-                    # which day or position, so this is the midpoint.
-                    difficulty="7",
-                    difficulty_basis="estimated",
-                    added=today,
-                    verified=today,
-                )
+    for match in CSES_TASK.finditer(body):
+        if match.group(1):
+            section = html.unescape(match.group(1)).strip()
+            continue
+        task_id, name = match.group(2), html.unescape(match.group(3)).strip()
+        rows.append(
+            csvio.blank_problem(
+                id=f"cses-{task_id}",
+                title=name,
+                origin="cses",
+                contest=f"CSES Problem Set - {section}" if section else "CSES Problem Set",
+                hosts="cses",
+                url=f"https://cses.fi/problemset/task/{task_id}",
+                format="standard",
+                difficulty=str(CSES_SECTION_TIER.get(section, 4)),
+                difficulty_basis="estimated",
+                added=today,
+                verified=today,
             )
-        time.sleep(pause)
+        )
+    if log:
+        log(f"  CSES: {len(rows)} problems")
     return rows
 
 
 # --- assembly ----------------------------------------------------------------
-SOURCES = ("ccc", "cco", "usaco", "ioi")
+SOURCES = ("ccc", "cco", "usaco", "cses") + OJUZ_SOURCES
 
 
 def build(today: str, sources=SOURCES, log: Callable[[str], None] | None = None) -> list[dict]:
@@ -251,10 +340,16 @@ def build(today: str, sources=SOURCES, log: Callable[[str], None] | None = None)
         if log:
             log("fetching USACO contest pages...")
         rows += usaco_rows(today, log=log)
-    if "ioi" in sources:
+    if "cses" in sources:
         if log:
-            log("fetching IOI problems from oj.uz...")
-        rows += ioi_rows(today, log=log)
+            log("fetching the CSES problem set...")
+        rows += cses_rows(today, log=log)
+    wanted = [s for s in OJUZ_SOURCES if s in sources]
+    if wanted:
+        if log:
+            log(f"fetching {len(wanted)} oj.uz source(s)...")
+        for source in wanted:
+            rows += ojuz_rows(source, today, log=log)
     return rows
 
 
