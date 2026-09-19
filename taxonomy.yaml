@@ -1976,6 +1976,18 @@ nodes:
     Use when the query budget is the real constraint. The budget's shape,
     typically a logarithm, names the intended strategy.
 
+- id: adhoc.unclassified
+  name: Unclassified
+  aliases: [untagged, unknown technique]
+  status: canonical
+  description: >
+    No published source names a technique for this problem, and nobody has
+    classified it by hand yet.
+  discriminator: >
+    Not a technique. A placeholder that keeps an unclassified problem findable
+    and countable instead of silently mis-tagged; replace it with a real leaf
+    when the problem is solved or an editorial appears.
+
 - id: adhoc.simulation
   name: Simulation
   status: canonical

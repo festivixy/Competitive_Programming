@@ -117,3 +117,28 @@ def test_merge_fills_a_blank_difficulty_but_does_not_overwrite() -> None:
     assert rows["cco-2014-p5"]["difficulty"] == "8"
     assert rows["cco-2012-p1"]["difficulty"] == "9"
     assert rows["cco-2012-p1"]["difficulty_basis"] == "official"
+
+
+IOI_INDEX = """
+<a href="/problems/source/ioi2015">2015</a>
+<a href="/problems/source/ioi2011">2011</a>
+"""
+IOI_YEAR = """
+<a href="/problem/view/IOI15_boxes">Boxes with souvenirs</a>
+<a href="/problem/view/IOI15_horses">Horses</a>
+"""
+
+
+def test_ioi_rows_walk_every_year(monkeypatch) -> None:
+    def fake(url, timeout=30.0):
+        return IOI_INDEX if url.endswith("/source/ioi") else IOI_YEAR
+
+    monkeypatch.setattr(fetch, "_get", fake)
+    rows = {r["id"]: r for r in fetch.ioi_rows("2026-09-19", pause=0)}
+    assert "ioi-2015-boxes" in rows and "ioi-2011-horses" in rows
+    row = rows["ioi-2015-boxes"]
+    assert row["title"] == "Boxes with souvenirs"
+    assert row["origin"] == "ioi"
+    assert row["format"] == "subtask"  # every IOI task is subtask-scored
+    assert row["url"] == "https://oj.uz/problem/view/IOI15_boxes"
+    assert not row["primary_tag"]

@@ -155,3 +155,41 @@ def test_coarse_still_defers_to_precise_sources() -> None:
 def test_coarse_gives_uncategorised_rows_the_default() -> None:
     out, _ = enrich.apply([row(id="a", free_tags="")], {}, coarse=True)
     assert out[0]["primary_tag"] == enrich.COARSE_DEFAULT
+
+
+# --- oj.uz / IOI matching -----------------------------------------------------
+GUIDE_IOI = {
+    "ioi-11-crocodile": {"mod": "shortest-paths", "tags": ["Shortest Path"]},
+    "IOI11_garden": {"mod": "func-graphs", "tags": ["Functional Graph"]},
+    "ioi-phidias": {"mod": "intro-dp", "tags": ["DP"]},
+}
+
+
+def ojuz(slug: str) -> dict:
+    return csvio.blank_problem(id="x", url=f"https://oj.uz/problem/view/{slug}")
+
+
+def test_guide_ioi_ids_match_across_their_three_spellings() -> None:
+    alt = enrich.guide_alt_index(GUIDE_IOI)
+    assert enrich.guide_tag_for_ojuz(ojuz("IOI11_crocodile"), alt) == (
+        "graphs.shortest_path.dijkstra"
+    )
+    assert enrich.guide_tag_for_ojuz(ojuz("IOI11_garden"), alt) == (
+        "graphs.special_graphs.functional_graph"
+    )
+    # no year in the guide id, matched on name alone
+    assert enrich.guide_tag_for_ojuz(ojuz("IOI04_phidias"), alt) == "dp.basics.linear"
+
+
+def test_unknown_ojuz_problem_stays_untagged() -> None:
+    alt = enrich.guide_alt_index(GUIDE_IOI)
+    assert enrich.guide_tag_for_ojuz(ojuz("IOI99_nosuchproblem"), alt) is None
+
+
+def test_uncategorised_rows_are_marked_unclassified_not_simulation(
+    real_taxonomy: Taxonomy,
+) -> None:
+    """An IOI task is not 'direct simulation'; say unclassified instead."""
+    out, _ = enrich.apply([row(id="a", free_tags="")], {}, coarse=True)
+    assert out[0]["primary_tag"] == "adhoc.unclassified"
+    assert real_taxonomy.is_leaf("adhoc.unclassified")

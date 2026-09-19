@@ -186,8 +186,53 @@ def usaco_rows(today: str, pause: float = 0.12, log: Callable[[str], None] | Non
     return list(seen.values())
 
 
+# --- IOI, via oj.uz ----------------------------------------------------------
+OJUZ_IOI_INDEX = "https://oj.uz/problems/source/ioi"
+OJUZ_YEAR = re.compile(r'href="/problems/source/ioi(\d{4})"')
+OJUZ_PROBLEM = re.compile(r'href="/problem/view/([A-Za-z0-9_]+)"[^>]*>([^<]+)<')
+
+
+def ioi_rows(today: str, pause: float = 0.12, log: Callable[[str], None] | None = None):
+    """Every IOI problem oj.uz hosts, walked year by year.
+
+    oj.uz is the only complete public mirror. It reaches back to 2003; earlier
+    IOIs are not hosted anywhere machine-readable.
+    """
+    index = _get(OJUZ_IOI_INDEX)
+    years = sorted(set(OJUZ_YEAR.findall(index)))
+    if log:
+        log(f"  {len(years)} IOI years listed")
+    rows = []
+    for year in years:
+        body = _get(f"https://oj.uz/problems/source/ioi{year}")
+        for slug, raw_name in OJUZ_PROBLEM.findall(body):
+            name = html.unescape(raw_name).strip()
+            tail = slug.split("_", 1)[-1].lower()
+            rows.append(
+                csvio.blank_problem(
+                    id=f"ioi-{year}-{re.sub(r'[^a-z0-9]+', '', tail)}",
+                    title=name,
+                    origin="ioi",
+                    contest=f"IOI {year}",
+                    year=year,
+                    hosts="oj.uz",
+                    url=f"https://oj.uz/problem/view/{slug}",
+                    # Every IOI task is scored by subtask.
+                    format="subtask",
+                    # SPEC.md 6.2 puts IOI tasks at 6-10; the slug does not say
+                    # which day or position, so this is the midpoint.
+                    difficulty="7",
+                    difficulty_basis="estimated",
+                    added=today,
+                    verified=today,
+                )
+            )
+        time.sleep(pause)
+    return rows
+
+
 # --- assembly ----------------------------------------------------------------
-SOURCES = ("ccc", "cco", "usaco")
+SOURCES = ("ccc", "cco", "usaco", "ioi")
 
 
 def build(today: str, sources=SOURCES, log: Callable[[str], None] | None = None) -> list[dict]:
@@ -206,6 +251,10 @@ def build(today: str, sources=SOURCES, log: Callable[[str], None] | None = None)
         if log:
             log("fetching USACO contest pages...")
         rows += usaco_rows(today, log=log)
+    if "ioi" in sources:
+        if log:
+            log("fetching IOI problems from oj.uz...")
+        rows += ioi_rows(today, log=log)
     return rows
 
 

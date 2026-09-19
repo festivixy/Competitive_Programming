@@ -290,8 +290,9 @@ COARSE_PRIORITY = [
     "implementation",
 ]
 
-# Rows with no category at all. "No named technique" is what this leaf means.
-COARSE_DEFAULT = "adhoc.simulation.direct"
+# Rows with no category at all. Mis-labelling these as simulation would be a
+# claim; `unclassified` states the actual situation and stays countable.
+COARSE_DEFAULT = "adhoc.unclassified"
 
 
 def coarse_tag_for(row: dict) -> str | None:
@@ -338,6 +339,48 @@ def fetch_guide(log: Callable[[str], None] | None = None) -> dict[str, dict]:
     return out
 
 
+OJUZ_SLUG = re.compile(r"oj\.uz/problem/view/([A-Za-z]+)(\d{2})_([A-Za-z0-9]+)")
+# usaco.guide spells its IOI ids three different ways -- `ioi-11-crocodile`,
+# `IOI11_garden`, `ioi-phidias` -- so they are indexed by (two-digit year,
+# name) with a name-only fallback rather than matched literally.
+GUIDE_ALT_ID = re.compile(r"^(?:ioi|other)[-_]?(\d{2})?[-_]([a-z0-9]+)$", re.I)
+
+
+def guide_alt_index(guide: dict[str, dict]) -> dict[tuple[str, str], dict]:
+    """Index of guide records by (two-digit year, name), for non-USACO ids."""
+    index: dict[tuple[str, str], dict] = {}
+    for uid, record in guide.items():
+        match = GUIDE_ALT_ID.match(uid)
+        if not match:
+            continue
+        year = match.group(1) or ""
+        name = match.group(2).lower()
+        index.setdefault((year, name), record)
+        index.setdefault(("", name), record)
+    return index
+
+
+def _tag_from_record(record: dict) -> str | None:
+    tag = GUIDE_MODULE_TAGS.get(record.get("mod") or "")
+    if tag:
+        return tag
+    present = set(record.get("tags") or ())
+    for candidate in GUIDE_TAG_PRIORITY:
+        if candidate in present:
+            return GUIDE_TAG_TAGS[candidate]
+    return None
+
+
+def guide_tag_for_ojuz(row: dict, alt: dict[tuple[str, str], dict]) -> str | None:
+    """The leaf usaco.guide implies for an oj.uz-hosted problem."""
+    match = OJUZ_SLUG.search(row.get("url", ""))
+    if not match:
+        return None
+    year, name = match.group(2), match.group(3).lower()
+    record = alt.get((year, name)) or alt.get(("", name))
+    return _tag_from_record(record) if record else None
+
+
 def guide_tag_for(row: dict, guide: dict[str, dict]) -> str | None:
     """The leaf tag usaco.guide implies for a catalogue row, if any.
 
@@ -353,14 +396,7 @@ def guide_tag_for(row: dict, guide: dict[str, dict]) -> str | None:
         return None
     if isinstance(record, str):  # older cache shape
         record = {"mod": record, "tags": []}
-    tag = GUIDE_MODULE_TAGS.get(record.get("mod") or "")
-    if tag:
-        return tag
-    present = set(record.get("tags") or ())
-    for candidate in GUIDE_TAG_PRIORITY:
-        if candidate in present:
-            return GUIDE_TAG_TAGS[candidate]
-    return None
+    return _tag_from_record(record)
 
 
 def dmoj_tag_for(row: dict) -> str | None:
@@ -381,6 +417,7 @@ def apply(
     for what that does and does not mean.
     """
     stats = {"guide": 0, "dmoj": 0, "coarse": 0, "already": 0, "unresolved": 0}
+    alt = guide_alt_index(guide)
     out = []
     for row in rows:
         row = dict(row)
@@ -389,7 +426,7 @@ def apply(
             out.append(row)
             continue
 
-        tag = guide_tag_for(row, guide)
+        tag = guide_tag_for(row, guide) or guide_tag_for_ojuz(row, alt)
         source = PROVENANCE_GUIDE
         if not tag:
             tag = dmoj_tag_for(row)
