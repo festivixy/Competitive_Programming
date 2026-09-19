@@ -40,8 +40,11 @@ MONTH_NAME = {
     "open": "US Open",
 }
 
-CCC_CODE = re.compile(r"^ccc(\d{2})([js])(\d)$")
-CCO_CODE = re.compile(r"^cco(\d{2})p(\d)$")
+CCC_CODE = re.compile(r"^ccc(\d{2})([js])(\d)([a-z]*)$")
+CCC_QR = re.compile(r"^cccjqrp(\d+)$")
+CCO_CODE = re.compile(r"^cco(\d{2})(?:l(\d))?p(\d)([a-z]*)$")
+CCO_PREP = re.compile(r"^ccoprep(\d+)p(\d+)$")
+CCO_QR = re.compile(r"^ccoqr(\d{2})p(\d+)$")
 
 # The division heading carries an <img>, so markup is allowed inside the h2.
 USACO_TOKEN = re.compile(
@@ -91,12 +94,35 @@ def ccc_rows(problems: list[dict], today: str) -> Iterator[dict]:
     for obj in problems:
         match = CCC_CODE.match(obj["code"])
         if not match:
+            qr = CCC_QR.match(obj["code"])
+            if qr:
+                # Junior qualification round practice set, no contest year.
+                yield csvio.blank_problem(
+                    id=f"ccc-qr-p{qr.group(1)}",
+                    title=obj["name"].split(" - ", 1)[-1],
+                    origin="ccc",
+                    contest="CCC Junior Qualification Round",
+                    label=f"QR{qr.group(1)}",
+                    hosts="dmoj",
+                    url=f"https://dmoj.ca/problem/{obj['code']}",
+                    format="standard",
+                    difficulty="1",
+                    difficulty_basis="estimated",
+                    difficulty_native=f"DMOJ {obj['points']:g}p",
+                    free_tags="|".join(
+                        str(t).lower().replace(" ", "-") for t in obj.get("types") or ()
+                    ),
+                    added=today,
+                    verified=today,
+                )
             continue
         year = _full_year(match.group(1))
         stream = match.group(2).upper()
-        label = f"{stream}{match.group(3)}"
+        # A trailing word marks a harder rejudged variant of the same slot.
+        variant = match.group(4)
+        label = f"{stream}{match.group(3)}" + (f" ({variant})" if variant else "")
         yield csvio.blank_problem(
-            id=f"ccc-{year}-{label.lower()}",
+            id=f"ccc-{year}-{re.sub(r'[^a-z0-9]+', '-', label.lower()).strip('-')}",
             title=obj["name"].split(" - ", 1)[-1],
             origin="ccc",
             contest=f"CCC {year} {'Senior' if stream == 'S' else 'Junior'}",
@@ -105,7 +131,9 @@ def ccc_rows(problems: list[dict], today: str) -> Iterator[dict]:
             hosts="dmoj",
             url=f"https://dmoj.ca/problem/{obj['code']}",
             format="standard",
-            difficulty=str(CCC_TIER.get(label, "")),
+            # A rejudged "hard" variant sits in the same contest slot, so it
+            # takes that slot's tier.
+            difficulty=str(CCC_TIER.get(f"{stream}{match.group(3)}", "")),
             difficulty_basis="estimated",
             difficulty_native=f"DMOJ {obj['points']:g}p",
             free_tags="|".join(str(t).lower().replace(" ", "-") for t in obj.get("types") or ()),
@@ -118,16 +146,66 @@ def cco_rows(problems: list[dict], today: str) -> Iterator[dict]:
     for obj in problems:
         match = CCO_CODE.match(obj["code"])
         if not match:
+            qr = CCO_QR.match(obj["code"])
+            if qr:
+                year = _full_year(qr.group(1))
+                yield csvio.blank_problem(
+                    id=f"cco-{year}-qr-p{qr.group(2)}",
+                    title=obj["name"].split(" - ", 1)[-1],
+                    origin="cco",
+                    contest=f"CCO {year} Qualification Round",
+                    year=str(year),
+                    label=f"QR P{qr.group(2)}",
+                    hosts="dmoj",
+                    url=f"https://dmoj.ca/problem/{obj['code']}",
+                    format="standard",
+                    difficulty="5",
+                    difficulty_basis="estimated",
+                    difficulty_native=f"DMOJ {obj['points']:g}p",
+                    free_tags="|".join(
+                        str(t).lower().replace(" ", "-") for t in obj.get("types") or ()
+                    ),
+                    added=today,
+                    verified=today,
+                )
+                continue
+            prep = CCO_PREP.match(obj["code"])
+            if prep:
+                yield csvio.blank_problem(
+                    id=f"cco-prep{prep.group(1)}-p{prep.group(2)}",
+                    title=obj["name"].split(" - ", 1)[-1],
+                    origin="cco",
+                    contest=f"CCO Preparation Contest {prep.group(1)}",
+                    label=f"P{prep.group(2)}",
+                    hosts="dmoj",
+                    url=f"https://dmoj.ca/problem/{obj['code']}",
+                    format="standard",
+                    difficulty="6",
+                    difficulty_basis="estimated",
+                    difficulty_native=f"DMOJ {obj['points']:g}p",
+                    free_tags="|".join(
+                        str(t).lower().replace(" ", "-") for t in obj.get("types") or ()
+                    ),
+                    added=today,
+                    verified=today,
+                )
             continue
         year = _full_year(match.group(1))
-        number = match.group(2)
+        level = match.group(2)
+        number = match.group(3)
+        variant = match.group(4)
         yield csvio.blank_problem(
-            id=f"cco-{year}-p{number}",
+            id=(
+                f"cco-{year}-"
+                + (f"l{level}" if level else "")
+                + f"p{number}"
+                + (f"-{variant}" if variant else "")
+            ),
             title=obj["name"].split(" - ", 1)[-1],
             origin="cco",
             contest=f"CCO {year}",
             year=str(year),
-            label=f"P{number}",
+            label=f"P{number}" + (f" (L{level})" if level else ""),
             hosts="dmoj",
             url=f"https://dmoj.ca/problem/{obj['code']}",
             format="standard",
@@ -140,50 +218,98 @@ def cco_rows(problems: list[dict], today: str) -> Iterator[dict]:
         )
 
 
-# --- USACO -------------------------------------------------------------------
-def usaco_rows(today: str, pause: float = 0.12, log: Callable[[str], None] | None = None):
-    """Every problem on a USACO contest results page."""
-    seen: dict[str, dict] = {}
-    for yy in USACO_YEARS:
-        for month in USACO_MONTHS:
-            page = f"{month}{yy:02d}results"
-            try:
-                body = _get(f"http://www.usaco.org/index.php?page={page}")
-            except Exception:  # noqa: BLE001 - a missing contest page is normal
+# --- USACO --------------------------------------------------------------------
+# The contest results pages only link problems from 2014 onward, and miss the
+# newest contests entirely, so the problem system itself is the source of
+# truth: every task has a cpid and a page naming its contest and division.
+USACO_PROBLEM_URL = "https://www.usaco.org/index.php?page=viewproblem2&cpid={cpid}"
+USACO_MAX_CPID = 1700
+USACO_H2 = re.compile(r"<h2>([^<]{0,90})</h2>")
+USACO_YEAR = re.compile(r"USACO\s+(\d{4})")
+USACO_DIVISION = re.compile(r"(Bronze|Silver|Gold|Platinum)", re.I)
+USACO_ROUND = re.compile(
+    r"(US Open|January|February|December|November|March|April|"
+    r"First Contest|Second Contest|Third Contest|Fourth Contest)",
+    re.I,
+)
+ROUND_SLUG = {
+    "us open": "open",
+    "january": "jan",
+    "february": "feb",
+    "december": "dec",
+    "november": "nov",
+    "march": "mar",
+    "april": "apr",
+    "first contest": "c1",
+    "second contest": "c2",
+    "third contest": "c3",
+    "fourth contest": "c4",
+}
+
+
+def usaco_problem(cpid: int) -> dict | None:
+    """One USACO task, or None when the cpid is unused."""
+    try:
+        body = _get(USACO_PROBLEM_URL.format(cpid=cpid), timeout=25)
+    except Exception:  # noqa: BLE001 - an unused cpid is normal
+        return None
+    headings = USACO_H2.findall(body)
+    if len(headings) < 2:
+        return None
+    header = html.unescape(headings[0]).strip()
+    title = re.sub(r"^Problem\s+\d+\.\s*", "", html.unescape(headings[1]).strip())
+    if not title:
+        return None
+    return {"cpid": cpid, "header": header, "title": title}
+
+
+def usaco_rows(
+    today: str,
+    pause: float = 0.0,
+    log: Callable[[str], None] | None = None,
+    max_cpid: int = USACO_MAX_CPID,
+    workers: int = 8,
+):
+    """Every USACO task, by sweeping the problem system's whole id space."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    rows = []
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        for found in pool.map(usaco_problem, range(1, max_cpid + 1)):
+            if not found:
                 continue
-            if "cpid=" not in body:
-                continue
-            division = ""
-            count = 0
-            for match in USACO_TOKEN.finditer(body):
-                if match.group(1):
-                    division = match.group(1).capitalize()
-                    continue
-                cpid = match.group(3)
-                title = html.unescape(match.group(2)).strip()
-                year = 2000 + yy
-                slug = "".join(c for c in title.lower() if c.isalnum())
-                seen[cpid] = csvio.blank_problem(
-                    id=f"usaco-{year}-{month}-{division.lower()}-{slug}",
+            header, title = found["header"], found["title"]
+            year_match = USACO_YEAR.search(header)
+            year = year_match.group(1) if year_match else ""
+            div_match = USACO_DIVISION.search(header)
+            division = div_match.group(1).capitalize() if div_match else ""
+            round_match = USACO_ROUND.search(header)
+            round_slug = ROUND_SLUG.get(round_match.group(1).lower(), "") if round_match else ""
+            slug = re.sub(r"[^a-z0-9]+", "", title.lower()) or f"cpid{found['cpid']}"
+            parts = ["usaco", year, round_slug, division.lower(), slug]
+            rows.append(
+                csvio.blank_problem(
+                    id="-".join(p for p in parts if p),
                     title=title,
                     origin="usaco",
-                    contest=f"USACO {year} {MONTH_NAME.get(month, month)} {division}".strip(),
-                    year=str(year),
+                    contest=header,
+                    year=year,
                     label=division,
                     hosts="usaco-official",
-                    url=f"https://www.usaco.org/index.php?page=viewproblem2&cpid={cpid}",
+                    url=USACO_PROBLEM_URL.format(cpid=found["cpid"]),
                     format="standard",
-                    difficulty=str(USACO_TIER.get(division, "")),
+                    # A contest whose divisions are not published yet still
+                    # needs a tier; the mid-scale value says "unknown".
+                    difficulty=str(USACO_TIER.get(division, 5)),
                     difficulty_basis="estimated",
                     difficulty_native=division,
                     added=today,
                     verified=today,
                 )
-                count += 1
-            if count and log:
-                log(f"  {page}: {count}")
-            time.sleep(pause)
-    return list(seen.values())
+            )
+    if log:
+        log(f"  USACO: {len(rows)} problems across cpid 1-{max_cpid}")
+    return rows
 
 
 # --- oj.uz-hosted olympiads ---------------------------------------------------
@@ -240,6 +366,7 @@ def ojuz_rows(
         time.sleep(pause)
 
         found = OJUZ_PROBLEM.findall(body)
+        children = sorted(set(re.findall(r'href="/problems/source/([a-z0-9]+)"', body)))
         if found:
             year_match = re.search(r"(\d{4})", slug)
             year = year_match.group(1) if year_match else ""
@@ -269,10 +396,11 @@ def ojuz_rows(
                         verified=today,
                     )
                 )
-            return
 
-        for child in sorted(set(re.findall(r'href="/problems/source/([a-z0-9]+)"', body))):
-            if child != slug and child.startswith(source[:3]):
+        # Some pages list problems *and* sub-pages, and a child's slug does not
+        # always start with its parent's, so descend unconditionally.
+        for child in children:
+            if child != slug and child not in seen_pages and child.startswith(source):
                 walk(child, depth + 1)
 
     walk(source, 0)

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from cpidx import csvio, fetch
 
 DMOJ = [
@@ -56,20 +58,6 @@ def test_unrelated_dmoj_problems_are_ignored() -> None:
     ids = [r["id"] for r in fetch.ccc_rows(DMOJ, "2026-09-19")]
     ids += [r["id"] for r in fetch.cco_rows(DMOJ, "2026-09-19")]
     assert not any("aplusb" in i for i in ids)
-
-
-def test_usaco_division_comes_from_the_heading(monkeypatch) -> None:
-    monkeypatch.setattr(
-        fetch, "_get", lambda url, timeout=30.0: USACO_PAGE if "jan17" in url else ""
-    )
-    monkeypatch.setattr(fetch, "USACO_YEARS", range(17, 18))
-    monkeypatch.setattr(fetch, "USACO_MONTHS", ("jan",))
-    rows = {r["title"]: r for r in fetch.usaco_rows("2026-09-19", pause=0)}
-    assert rows["Promotion Counting"]["label"] == "Platinum"
-    assert rows["Promotion Counting"]["difficulty"] == "8"
-    assert rows["Don't Be Last!"]["label"] == "Bronze"
-    assert rows["Don't Be Last!"]["difficulty"] == "2"
-    assert "cpid=696" in rows["Promotion Counting"]["url"]
 
 
 def test_merge_keeps_curated_rows_and_skips_indexed_ids() -> None:
@@ -142,3 +130,73 @@ def test_ioi_rows_walk_every_year(monkeypatch) -> None:
     assert row["format"] == "subtask"  # every IOI task is subtask-scored
     assert row["url"] == "https://oj.uz/problem/view/IOI15_boxes"
     assert not row["primary_tag"]
+
+
+@pytest.mark.parametrize(
+    "code,expected_id",
+    [
+        ("ccc21s4", "ccc-2021-s4"),
+        ("ccc00s5hard", "ccc-2000-s5-hard"),  # rejudged harder variant
+        ("cccjqrp3", "ccc-qr-p3"),  # junior qualification practice
+    ],
+)
+def test_ccc_variant_codes_are_not_dropped(code: str, expected_id: str) -> None:
+    problems = [{"code": code, "name": f"CCC - {code}", "points": 5.0, "types": []}]
+    assert [r["id"] for r in fetch.ccc_rows(problems, "2026-09-19")] == [expected_id]
+
+
+def test_ccc_hard_variant_inherits_its_contest_slot_tier() -> None:
+    problems = [{"code": "ccc00s5hard", "name": "CCC - x", "points": 25.0, "types": []}]
+    row = next(iter(fetch.ccc_rows(problems, "2026-09-19")))
+    assert row["difficulty"] == "7"  # same tier as S5
+
+
+@pytest.mark.parametrize(
+    "code,expected_id",
+    [
+        ("cco12p1", "cco-2012-p1"),
+        ("cco26l2p1", "cco-2026-l2p1"),  # second-level contest
+        ("cco24p4hard", "cco-2024-p4-hard"),
+        ("ccoprep1p2", "cco-prep1-p2"),
+        ("ccoqr16p1", "cco-2016-qr-p1"),
+    ],
+)
+def test_cco_variant_codes_are_not_dropped(code: str, expected_id: str) -> None:
+    problems = [{"code": code, "name": f"CCO - {code}", "points": 10.0, "types": []}]
+    assert [r["id"] for r in fetch.cco_rows(problems, "2026-09-19")] == [expected_id]
+
+
+USACO_PAGE = """
+<h2> USACO 2011 November Contest, Bronze Division </h2>
+<h2> Problem 1. Contest Timing </h2>
+"""
+USACO_NO_DIVISION = """
+<h2> USACO 2026 US Open </h2>
+<h2> Problem 1. Arranging Cows </h2>
+"""
+
+
+def test_usaco_sweep_reads_the_problem_page_not_the_results_page(monkeypatch) -> None:
+    """Results pages omit pre-2014 and the newest contests; cpids do not."""
+    monkeypatch.setattr(
+        fetch, "_get", lambda url, timeout=30.0: USACO_PAGE if "cpid=84" in url else ""
+    )
+    rows = fetch.usaco_rows("2026-09-19", max_cpid=84, workers=1)
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["id"] == "usaco-2011-nov-bronze-contesttiming"
+    assert row["year"] == "2011"
+    assert row["label"] == "Bronze"
+    assert row["difficulty"] == "2"
+
+
+def test_usaco_contest_without_a_published_division_still_gets_a_tier(monkeypatch) -> None:
+    monkeypatch.setattr(fetch, "_get", lambda url, timeout=30.0: USACO_NO_DIVISION)
+    row = fetch.usaco_rows("2026-09-19", max_cpid=1, workers=1)[0]
+    assert row["label"] == ""
+    assert row["difficulty"] == "5"
+
+
+def test_unused_cpid_yields_nothing(monkeypatch) -> None:
+    monkeypatch.setattr(fetch, "_get", lambda url, timeout=30.0: "<html>no problem</html>")
+    assert fetch.usaco_rows("2026-09-19", max_cpid=3, workers=1) == []
