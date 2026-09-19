@@ -266,6 +266,10 @@ __NAV__
         </div>
       </div>
       <div class="field">
+        <label for="level">Level</label>
+        <select id="level" autocomplete="off"></select>
+      </div>
+      <div class="field">
         <label for="sort">Sort</label>
         <select id="sort" autocomplete="off">
           <option value="difficulty">Tier, easiest first</option>
@@ -347,7 +351,7 @@ __NAV__
   function countOrigin(o) { return problems.filter(function (p) { return p.o === o; }).length; }
   origins.sort(function (a, b) { return countOrigin(b) - countOrigin(a); });
 
-  var state = { q: "", cat: "", tag: "", dmin: 1, dmax: 10, origins: [],
+  var state = { q: "", cat: "", tag: "", level: "", dmin: 1, dmax: 10, origins: [],
                 unsolved: false, canonical: false, precise: false,
                 sort: "difficulty", limit: PAGE };
 
@@ -410,6 +414,48 @@ __NAV__
     });
   });
 
+  // USACO divisions ascend Bronze -> Platinum, CCC runs J1-J5 then S1-S5, CCO
+  // P1-P6. Alphabetical order would put Bronze after Platinum, so rank them.
+  var LEVEL_ORDER = ["Bronze", "Silver", "Gold", "Platinum"];
+  function levelRank(label) {
+    var known = LEVEL_ORDER.indexOf(label);
+    if (known >= 0) return [0, known, ""];
+    var m = /^([JSP])\s*(\d+)/.exec(label);
+    if (m) return [1, { J: 0, S: 1, P: 2 }[m[1]], m[1] + m[2].padStart(2, "0")];
+    return [2, 0, label];
+  }
+  var levelSel = document.getElementById("level");
+  var levels = [];
+  problems.forEach(function (p) { if (p.l && levels.indexOf(p.l) < 0) levels.push(p.l); });
+  levels.sort(function (a, b) {
+    var ra = levelRank(a), rb = levelRank(b);
+    return ra[0] - rb[0] || ra[1] - rb[1] || String(ra[2]).localeCompare(String(rb[2]))
+        || a.localeCompare(b);
+  });
+  levelSel.innerHTML =
+    '<option value="">Any</option>' +
+    levels.map(function (l) {
+      return '<option value="' + esc(l) + '">' + esc(l) + "</option>";
+    }).join("");
+  var levelLabels = [];
+  Array.prototype.forEach.call(levelSel.options, function (option) {
+    levelLabels.push({ option: option, id: option.value, base: option.value || "Any" });
+  });
+
+  function updateLevelCounts() {
+    var tally = {};
+    var any = 0;
+    problems.forEach(function (p) {
+      if (!matches(p, "level")) return;
+      any += 1;
+      if (p.l) tally[p.l] = (tally[p.l] || 0) + 1;
+    });
+    levelLabels.forEach(function (entry) {
+      var n = entry.id === "" ? any : tally[entry.id] || 0;
+      entry.option.textContent = entry.base + " (" + n + ")";
+    });
+  }
+
   function updateCatCounts() {
     var tally = {};
     var total = 0;
@@ -457,43 +503,41 @@ __NAV__
   document.getElementById("flags").innerHTML = flags;
 
   // --- filtering -----------------------------------------------------------
-  function matches(p) {
-    var d = parseInt(p.d, 10) || 0;
+  // One predicate for everything. `skip` leaves out a single filter so that
+  // filter's own facet counts stay meaningful: a technique count computed
+  // with the technique filter still applied would read 0 for every other
+  // option.
+  function matches(p, skip) {
     var narrowed = state.dmin > 1 || state.dmax < 10;
-    // A row with no tier is only hidden once the tier filter is actually used.
-    if (narrowed && (d < state.dmin || d > state.dmax)) return false;
-    if (state.precise && p.cz) return false;
-    if (state.cat === "__unclassified") {
-      if (p.pt !== UNCLASSIFIED) return false;
-    } else if (state.cat && (!p.pt || p.pt === UNCLASSIFIED || catOf(p.pt) !== state.cat)) {
-      return false;
+    if (narrowed && skip !== "tier") {
+      var d = parseInt(p.d, 10) || 0;
+      // A row with no tier is only hidden once the tier filter is used.
+      if (d < state.dmin || d > state.dmax) return false;
     }
-    if (state.tag && p.tg.indexOf(state.tag) < 0) return false;
+    if (state.precise && p.cz) return false;
+    if (skip !== "technique") {
+      if (state.cat === "__unclassified") {
+        if (p.pt !== UNCLASSIFIED) return false;
+      } else if (state.cat && (!p.pt || p.pt === UNCLASSIFIED || catOf(p.pt) !== state.cat)) {
+        return false;
+      }
+      if (state.tag && p.tg.indexOf(state.tag) < 0) return false;
+    }
+    if (skip !== "level" && state.level && p.l !== state.level) return false;
     if (state.origins.length && state.origins.indexOf(p.o) < 0) return false;
     if (state.unsolved && p.s) return false;
     if (state.canonical && !p.k) return false;
     if (state.q) {
-      var hay = (p.t + " " + p.id + " " + p.tg.join(" ") + " " + p.ft.join(" ") + " " + p.c).toLowerCase();
+      var hay = (
+        p.t + " " + p.id + " " + p.tg.join(" ") + " " + p.ft.join(" ") + " " + p.c
+      ).toLowerCase();
       if (hay.indexOf(state.q) < 0) return false;
     }
     return true;
   }
 
-  // Every filter except the technique ones, so the count of rows a technique
-  // filter necessarily excludes can be reported.
   function matchesExceptTechnique(p) {
-    var d = parseInt(p.d, 10) || 0;
-    var narrowed = state.dmin > 1 || state.dmax < 10;
-    if (narrowed && (d < state.dmin || d > state.dmax)) return false;
-    if (state.precise && p.cz) return false;
-    if (state.origins.length && state.origins.indexOf(p.o) < 0) return false;
-    if (state.unsolved && p.s) return false;
-    if (state.canonical && !p.k) return false;
-    if (state.q) {
-      var hay = (p.t + " " + p.id + " " + p.tg.join(" ") + " " + p.ft.join(" ") + " " + p.c).toLowerCase();
-      if (hay.indexOf(state.q) < 0) return false;
-    }
-    return true;
+    return matches(p, "technique");
   }
 
   function byTitle(a, b) { return a.t.localeCompare(b.t); }
@@ -535,7 +579,7 @@ __NAV__
   }
 
   function render() {
-    var out = problems.filter(matches).sort(SORTS[state.sort]);
+    var out = problems.filter(function (p) { return matches(p); }).sort(SORTS[state.sort]);
     var page = out.slice(0, state.limit);
     document.getElementById("rows").innerHTML = page.map(rowHtml).join("");
     document.getElementById("shown").textContent = out.length;
@@ -554,7 +598,7 @@ __NAV__
       more.hidden = true;
     }
 
-    var active = state.q || state.cat || state.tag || state.origins.length ||
+    var active = state.q || state.cat || state.tag || state.level || state.origins.length ||
                  state.unsolved || state.canonical || state.precise ||
                  state.dmin > 1 || state.dmax < 10;
     document.getElementById("reset").hidden = !active;
@@ -573,6 +617,7 @@ __NAV__
     }
     document.getElementById("activefilter").textContent = note;
     updateCatCounts();
+    updateLevelCounts();
   }
 
   function refresh() { state.limit = PAGE; render(); }
@@ -590,6 +635,10 @@ __NAV__
   dmax.addEventListener("change", function (e) {
     state.dmax = +e.target.value;
     if (state.dmax < state.dmin) { state.dmin = state.dmax; dmin.value = e.target.value; }
+    refresh();
+  });
+  levelSel.addEventListener("change", function (e) {
+    state.level = e.target.value;
     refresh();
   });
   document.getElementById("sort").addEventListener("change", function (e) {
@@ -614,7 +663,7 @@ __NAV__
     state.tag = b.dataset.tag; state.cat = ""; catSel.value = ""; refresh();
   });
   function clearFilters() {
-    state = { q: "", cat: "", tag: "", dmin: 1, dmax: 10, origins: [],
+    state = { q: "", cat: "", tag: "", level: "", dmin: 1, dmax: 10, origins: [],
               unsolved: false, canonical: false, precise: false,
               sort: state.sort, limit: PAGE };
     syncControlsToState();
@@ -708,6 +757,7 @@ __NAV__
     catSel.value = state.cat;
     dmin.value = String(state.dmin);
     dmax.value = String(state.dmax);
+    levelSel.value = state.level;
     document.getElementById("sort").value = state.sort;
     var chips = document.querySelectorAll("#origins [data-origin], #flags [data-flag]");
     Array.prototype.forEach.call(chips, function (chip) {
