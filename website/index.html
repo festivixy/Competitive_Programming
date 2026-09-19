@@ -405,6 +405,8 @@ table.cov tr.catrow th {
 
   // --- controls ------------------------------------------------------------
   var UNCLASSIFIED = "adhoc.unclassified";
+  var byCatId = {};
+  cats.forEach(function (c) { byCatId[c.id] = c; });
   var unclassifiedCount = problems.filter(function (p) { return p.pt === UNCLASSIFIED; }).length;
 
   // Counted separately: lumping the placeholder into Ad hoc makes that
@@ -413,14 +415,55 @@ table.cov tr.catrow th {
   catSel.innerHTML =
     '<option value="">All</option>' +
     cats.map(function (c) {
-      var n = problems.filter(function (p) {
-        return p.pt && p.pt !== UNCLASSIFIED && catOf(p.pt) === c.id;
-      }).length;
-      return '<option value="' + c.id + '">' + esc(c.name) + " (" + n + ")</option>";
+      return '<option value="' + c.id + '">' + esc(c.name) + "</option>";
     }).join("") +
-    (unclassifiedCount
-      ? '<option value="__unclassified">Unclassified (' + unclassifiedCount + ")</option>"
-      : "");
+    (unclassifiedCount ? '<option value="__unclassified">Unclassified</option>' : "");
+
+  // The counts beside each technique are a facet, not a fixed total: they say
+  // how many problems that technique would return *given the other filters*,
+  // so narrowing to one judge renumbers them instead of promising 380 graph
+  // problems and delivering 12.
+  var catLabels = [];
+  Array.prototype.forEach.call(catSel.options, function (option) {
+    var node = option.value ? byCatId[option.value] : null;
+    catLabels.push({
+      option: option,
+      id: option.value,
+      base: option.value === ""
+        ? "All"
+        : option.value === "__unclassified"
+          ? "Unclassified"
+          : node
+            ? node.name
+            : option.value,
+    });
+  });
+
+  function updateCatCounts() {
+    var tally = {};
+    var total = 0;
+    var unclassified = 0;
+    problems.forEach(function (p) {
+      if (!matchesExceptTechnique(p)) return;
+      total += 1;
+      if (!p.pt) return;
+      if (p.pt === UNCLASSIFIED) {
+        unclassified += 1;
+        return;
+      }
+      var key = catOf(p.pt);
+      tally[key] = (tally[key] || 0) + 1;
+    });
+    catLabels.forEach(function (entry) {
+      var n =
+        entry.id === ""
+          ? total
+          : entry.id === "__unclassified"
+            ? unclassified
+            : tally[entry.id] || 0;
+      entry.option.textContent = entry.base + " (" + n + ")";
+    });
+  }
 
   var dmin = document.getElementById("dmin"), dmax = document.getElementById("dmax");
   for (var t = 1; t <= 10; t++) {
@@ -558,6 +601,7 @@ table.cov tr.catrow th {
       }
     }
     document.getElementById("activefilter").textContent = note;
+    updateCatCounts();
   }
 
   function refresh() { state.limit = PAGE; render(); }
