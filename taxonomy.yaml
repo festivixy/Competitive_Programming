@@ -1,0 +1,2001 @@
+# Controlled vocabulary for the problem index. Normative; SPEC.md 7 is
+# illustrative. Problems are tagged with leaf nodes only; ancestor membership
+# is derived, never stored.
+#
+# Every leaf carries a `discriminator`: one sentence saying when to reach for
+# this technique over its siblings. A leaf without one is a validation error,
+# because a tag that cannot be distinguished from its siblings will be applied
+# inconsistently.
+version: 0
+
+nodes:
+
+# ============================================================ graphs =========
+- id: graphs
+  name: Graphs
+  status: canonical
+  description: Techniques on general vertex-and-edge structures.
+
+- id: graphs.traversal
+  name: Traversal
+  status: canonical
+  description: Systematic visiting of vertices, and the orderings that fall out.
+
+- id: graphs.traversal.bfs
+  name: Breadth-first search
+  aliases: [bfs, breadth first search]
+  status: canonical
+  description: Layer-by-layer traversal from a source, giving shortest paths in edge count.
+  discriminator: >
+    Use when edges are unweighted and you need distance or reachability. If
+    weights exist but are only 0 and 1, use zero_one_bfs instead.
+
+- id: graphs.traversal.dfs
+  name: Depth-first search
+  aliases: [dfs, depth first search]
+  status: canonical
+  description: Traversal exhausting each branch before backtracking, exposing entry and exit times.
+  discriminator: >
+    Use when the answer depends on the recursion structure itself, such as
+    subtree aggregation, cycle detection, or entry and exit timestamps, rather
+    than on distance from a source.
+
+- id: graphs.traversal.topological_sort
+  name: Topological sort
+  aliases: [toposort, topological ordering, kahn]
+  status: canonical
+  prerequisites: [graphs.traversal.dfs]
+  description: Linear ordering of a DAG in which every edge points forward.
+  discriminator: >
+    Use when the graph is acyclic and the problem is really about dependency
+    order. If you also need to detect whether a cycle exists, this is the
+    cheapest detector.
+
+- id: graphs.traversal.connectivity
+  name: Connectivity
+  aliases: [connected components, flood fill]
+  status: canonical
+  prerequisites: [graphs.traversal.dfs]
+  description: Partitioning vertices into mutually reachable groups.
+  discriminator: >
+    Use for plain undirected reachability. Directed reachability with cycles
+    collapsed is components.scc_tarjan; edges whose removal disconnects is
+    components.bridges.
+
+- id: graphs.traversal.euler_tour
+  name: Eulerian path and circuit
+  aliases: [eulerian circuit, hierholzer]
+  status: canonical
+  prerequisites: [graphs.traversal.dfs, graphs.traversal.connectivity]
+  description: A walk using every edge exactly once, constructed by Hierholzer's algorithm.
+  discriminator: >
+    Use when the object being sequenced is the edge set, not the vertex set.
+    Degree parity decides existence before you build anything.
+
+- id: graphs.shortest_path
+  name: Shortest paths
+  status: canonical
+  description: Minimum-cost walks under varying weight assumptions.
+
+- id: graphs.shortest_path.dijkstra
+  name: Dijkstra
+  aliases: [dijkstras algorithm]
+  status: canonical
+  prerequisites: [graphs.traversal.bfs, data_structures.linear.heap]
+  description: Single-source shortest paths with non-negative weights via a priority queue.
+  discriminator: >
+    The default once weights are non-negative and not all equal. Reach past it
+    only when a negative weight exists, or when the log factor is the stated
+    bottleneck.
+
+- id: graphs.shortest_path.bellman_ford
+  name: Bellman-Ford
+  aliases: [spfa]
+  status: canonical
+  prerequisites: [graphs.shortest_path.dijkstra]
+  description: Single-source shortest paths tolerating negative weights, detecting negative cycles.
+  discriminator: >
+    Use when a negative edge exists, or when the problem asks whether cost can
+    be driven down without bound. Otherwise Dijkstra dominates it.
+
+- id: graphs.shortest_path.floyd_warshall
+  name: Floyd-Warshall
+  aliases: [all pairs shortest path, apsp]
+  status: canonical
+  description: All-pairs shortest paths by dynamic programming over intermediate vertices.
+  discriminator: >
+    Use when the vertex count is small, roughly n <= 500, and you need every
+    pair, or when the relaxation operator is something other than min-plus and
+    the triple loop is the point.
+
+- id: graphs.shortest_path.zero_one_bfs
+  name: 0-1 BFS
+  aliases: [01 bfs, zero-one bfs, deque bfs]
+  status: canonical
+  prerequisites: [graphs.traversal.bfs, data_structures.linear.deque]
+  description: >
+    Shortest paths on a graph whose edge weights are all 0 or 1, using a deque
+    in place of a priority queue for O(V+E).
+  discriminator: >
+    Use when weights are exactly 0 or 1 and Dijkstra's log factor is the
+    bottleneck, or when the 0-1 structure is created by a reduction rather than
+    given.
+
+- id: graphs.shortest_path.dial
+  name: Dial's algorithm
+  aliases: [bucket queue dijkstra]
+  status: canonical
+  prerequisites: [graphs.shortest_path.zero_one_bfs]
+  description: Bucket-queue shortest paths for small integer weights.
+  discriminator: >
+    Use when weights are small integers bounded by a constant larger than one;
+    below that zero_one_bfs is simpler and above it Dijkstra is faster.
+
+- id: graphs.shortest_path.k_shortest
+  name: K shortest paths
+  status: canonical
+  prerequisites: [graphs.shortest_path.dijkstra]
+  description: Enumerating the k best walks rather than only the optimum.
+  discriminator: >
+    Use when the problem asks for the k-th best value, not the best. Recognized
+    by a bounded k in the constraints alongside a shortest-path structure.
+
+- id: graphs.shortest_path.shortest_path_dag
+  name: Shortest paths on a DAG
+  status: canonical
+  prerequisites: [graphs.traversal.topological_sort]
+  description: Relaxation in topological order, linear time and sign-agnostic.
+  discriminator: >
+    Use when the graph is acyclic. Beats Dijkstra outright and handles negative
+    weights for free, so check acyclicity before reaching for anything heavier.
+
+- id: graphs.shortest_path.potentials
+  name: Johnson potentials
+  aliases: [reweighting, johnsons algorithm]
+  status: canonical
+  prerequisites: [graphs.shortest_path.bellman_ford, graphs.shortest_path.dijkstra]
+  description: Reweighting edges to non-negative values so Dijkstra applies to graphs with negative edges.
+  discriminator: >
+    Use when negative edges exist and you need many shortest-path queries, so
+    one Bellman-Ford pass buys repeated Dijkstra runs. Also the standard
+    subroutine inside min-cost flow.
+
+- id: graphs.components
+  name: Components and cuts
+  status: canonical
+  description: Decomposition by connectivity that survives vertex or edge removal.
+
+- id: graphs.components.scc_tarjan
+  name: Strongly connected components (Tarjan)
+  aliases: [scc, tarjan scc]
+  status: canonical
+  prerequisites: [graphs.traversal.dfs]
+  description: Single-pass lowlink decomposition of a digraph into maximal mutually reachable sets.
+  discriminator: >
+    The default SCC routine; one DFS pass and it emits components in reverse
+    topological order. Prefer kosaraju only when you want the two-pass argument
+    to be visible in the code.
+
+- id: graphs.components.scc_kosaraju
+  name: Strongly connected components (Kosaraju)
+  aliases: [kosaraju]
+  status: canonical
+  prerequisites: [graphs.traversal.dfs]
+  description: Two-pass SCC decomposition using the transpose graph.
+  discriminator: >
+    Use when you already need the transpose graph for another reason, or when
+    clarity matters more than the constant factor.
+
+- id: graphs.components.condensation
+  name: Condensation graph
+  aliases: [scc dag, component graph]
+  status: canonical
+  prerequisites: [graphs.components.scc_tarjan, graphs.traversal.topological_sort]
+  description: The DAG obtained by contracting each SCC to a single vertex.
+  discriminator: >
+    Tag this rather than scc_tarjan when the real work happens after
+    contraction, typically a DP or longest path over the resulting DAG.
+
+- id: graphs.components.bridges
+  name: Bridges
+  aliases: [cut edges]
+  status: canonical
+  prerequisites: [graphs.traversal.dfs]
+  description: Edges whose removal increases the number of connected components.
+  discriminator: >
+    Use when the question is about edge failure or about which edges lie on no
+    cycle. Vertex failure is articulation_points.
+
+- id: graphs.components.articulation_points
+  name: Articulation points
+  aliases: [cut vertices]
+  status: canonical
+  prerequisites: [graphs.traversal.dfs]
+  description: Vertices whose removal increases the number of connected components.
+  discriminator: >
+    Use when the question is about vertex failure. The root of the DFS tree is
+    the special case that catches most wrong implementations.
+
+- id: graphs.components.biconnected
+  name: Biconnected components
+  aliases: [block cut tree, bcc]
+  status: canonical
+  prerequisites: [graphs.components.articulation_points]
+  description: Maximal subgraphs with no articulation point, and the block-cut tree over them.
+  discriminator: >
+    Use when you must reason about all paths between two vertices, not merely
+    one. If finding the cut vertices is the whole answer, tag
+    articulation_points instead.
+
+- id: graphs.components.two_sat
+  name: 2-SAT
+  aliases: [2sat, two satisfiability]
+  status: canonical
+  prerequisites: [graphs.components.scc_tarjan]
+  description: Satisfying a conjunction of two-literal clauses via SCCs of the implication graph.
+  discriminator: >
+    Use when every constraint is a choice between exactly two options with
+    pairwise implications. The giveaway is binary per-item decisions plus
+    if-then constraints between them.
+
+- id: graphs.matching
+  name: Matching
+  status: canonical
+  description: Pairing vertices subject to disjointness.
+
+- id: graphs.matching.bipartite_kuhn
+  name: Kuhn's algorithm
+  aliases: [kuhn, bipartite matching, augmenting path]
+  status: canonical
+  prerequisites: [graphs.traversal.dfs]
+  description: Maximum bipartite matching by repeated augmenting-path search, O(VE).
+  discriminator: >
+    The default bipartite matching when the vertex count is at most a few
+    thousand. Above that, or when the bound is tight, use hopcroft_karp.
+
+- id: graphs.matching.hopcroft_karp
+  name: Hopcroft-Karp
+  status: canonical
+  prerequisites: [graphs.matching.bipartite_kuhn]
+  description: Maximum bipartite matching in O(E sqrt V) by augmenting along maximal vertex-disjoint path sets.
+  discriminator: >
+    Use when Kuhn's O(VE) is provably too slow for the stated bounds. The
+    problem is otherwise identical, so tag by which complexity the constraints
+    force.
+
+- id: graphs.matching.hungarian
+  name: Hungarian algorithm
+  aliases: [assignment problem, kuhn munkres]
+  status: canonical
+  prerequisites: [graphs.matching.bipartite_kuhn]
+  description: Minimum-cost perfect matching in a weighted bipartite graph.
+  discriminator: >
+    Use when edges carry costs and you need the cheapest perfect assignment.
+    Unweighted maximum cardinality is bipartite_kuhn; general graphs are
+    general_blossom.
+
+- id: graphs.matching.general_blossom
+  name: Blossom algorithm
+  aliases: [edmonds blossom, general matching]
+  status: canonical
+  prerequisites: [graphs.matching.bipartite_kuhn]
+  description: Maximum matching in a general graph by contracting odd cycles.
+  discriminator: >
+    Use only when the graph is provably not bipartite. Check for an odd cycle
+    first; almost every matching problem that looks general is secretly
+    bipartite.
+
+- id: graphs.spanning
+  name: Spanning structures
+  status: canonical
+  description: Acyclic subgraphs touching every vertex.
+
+- id: graphs.spanning.mst
+  name: Minimum spanning tree
+  aliases: [kruskal, prim, mst]
+  status: canonical
+  prerequisites: [data_structures.disjoint_set.dsu]
+  description: Cheapest acyclic connected subgraph, via Kruskal or Prim.
+  discriminator: >
+    Use when the objective is the total cost of keeping everything connected.
+    If the objective is the single worst edge on a path, that is the bottleneck
+    variant.
+
+- id: graphs.spanning.bottleneck
+  name: Minimax path and bottleneck trees
+  aliases: [minimax path, bottleneck shortest path]
+  status: canonical
+  prerequisites: [graphs.spanning.mst]
+  description: Minimizing the maximum edge weight along a path, answered by the MST.
+  discriminator: >
+    Use when the cost of a route is its worst edge rather than its sum. The MST
+    already contains every answer, which is the observation being tested.
+
+- id: graphs.spanning.directed_mst
+  name: Directed MST
+  aliases: [arborescence, chu liu edmonds]
+  status: canonical
+  prerequisites: [graphs.spanning.mst, graphs.components.scc_tarjan]
+  description: Minimum-cost arborescence rooted at a fixed vertex.
+  discriminator: >
+    Use when edges are directed and a root is fixed. Kruskal and Prim are both
+    wrong here, which is the trap the problem is usually set to catch.
+
+- id: graphs.special_graphs
+  name: Special graph classes
+  status: canonical
+  description: Structures whose extra guarantees admit faster algorithms.
+
+- id: graphs.special_graphs.functional_graph
+  name: Functional graph
+  aliases: [successor graph, rho shape]
+  status: canonical
+  prerequisites: [graphs.traversal.dfs]
+  description: Graphs with outdegree exactly one, decomposing into rho-shaped trees on cycles.
+  discriminator: >
+    Recognized by each node pointing to exactly one other. Use when the answer
+    needs the cycle each start eventually enters.
+
+- id: graphs.special_graphs.dag
+  name: DAG structure
+  aliases: [directed acyclic graph, path cover]
+  status: canonical
+  prerequisites: [graphs.traversal.topological_sort]
+  description: Properties specific to acyclic digraphs, including path counting and minimum path cover.
+  discriminator: >
+    Use when acyclicity itself unlocks the solution and the technique is not
+    already covered by shortest_path_dag.
+
+- id: graphs.special_graphs.planar
+  name: Planar graphs
+  status: canonical
+  description: Graphs embeddable in the plane, with Euler's formula bounding edges.
+  discriminator: >
+    Use when the embedding, face structure, or the linear edge bound is load
+    bearing. Rare outside geometry-flavoured problems.
+
+- id: graphs.special_graphs.chordal
+  name: Chordal graphs
+  aliases: [perfect elimination ordering, interval graph]
+  status: canonical
+  description: Graphs whose every long cycle has a chord, admitting perfect elimination orderings.
+  discriminator: >
+    Use when the graph is an interval or subtree intersection graph and
+    colouring or clique problems become polynomial as a result.
+
+# ============================================================= trees =========
+- id: trees
+  name: Trees
+  status: canonical
+  description: Techniques exploiting acyclic connected structure.
+
+- id: trees.basics
+  name: Tree basics
+  status: canonical
+  description: Rooting, depth, subtree sizes, and the quantities that follow.
+
+- id: trees.basics.traversal
+  name: Tree traversal and subtree aggregation
+  aliases: [subtree sum, tree dfs]
+  status: canonical
+  prerequisites: [graphs.traversal.dfs]
+  description: Rooting a tree and accumulating values over subtrees in one pass.
+  discriminator: >
+    The baseline tree technique. Tag something more specific if the answer
+    needs every root, which is dp.tree.rerooting.
+
+- id: trees.basics.diameter
+  name: Tree diameter
+  aliases: [longest path in tree, double bfs]
+  status: canonical
+  prerequisites: [trees.basics.traversal]
+  description: The longest path in a tree, found by two traversals or one DP.
+  discriminator: >
+    Use when the objective is the extreme distance between any pair. The
+    two-BFS argument is itself the observation being tested.
+
+- id: trees.basics.euler_tour
+  name: Euler tour flattening
+  aliases: [tin tout, subtree to range]
+  status: canonical
+  prerequisites: [trees.basics.traversal]
+  description: Mapping subtrees to contiguous index ranges via entry and exit times.
+  discriminator: >
+    Use when a subtree query must become a range query so an array structure
+    applies. Path queries instead want hld or lca.
+
+- id: trees.ancestors
+  name: Ancestor queries
+  status: canonical
+  description: Answering questions about vertices above a given node.
+
+- id: trees.ancestors.binary_lifting
+  name: Binary lifting
+  aliases: [sparse ancestor table, kth ancestor, jump pointers]
+  status: canonical
+  prerequisites: [trees.basics.traversal]
+  description: Precomputed power-of-two ancestor jumps for O(log n) ancestor and LCA queries.
+  discriminator: >
+    Use when you need the k-th ancestor itself, or when you must jump while
+    testing a predicate. Pure LCA with heavy query counts may prefer the sparse
+    table reduction.
+
+- id: trees.ancestors.lca
+  name: Lowest common ancestor
+  aliases: [lca, rmq lca]
+  status: canonical
+  prerequisites: [trees.basics.euler_tour, data_structures.static_range.sparse_table]
+  description: The deepest vertex that is an ancestor of two given vertices.
+  discriminator: >
+    Use when path distance or path decomposition is the goal and the tree is
+    static. If the tree changes, use link-cut style structures instead.
+
+- id: trees.decomposition
+  name: Tree decomposition
+  status: canonical
+  description: Splitting a tree into pieces that make queries tractable.
+
+- id: trees.decomposition.hld
+  name: Heavy-light decomposition
+  aliases: [hld, heavy path decomposition]
+  status: canonical
+  prerequisites: [trees.basics.euler_tour, data_structures.range_query.segment_tree]
+  description: Partitioning a tree into heavy paths so any root path crosses O(log n) of them.
+  discriminator: >
+    Use when path queries must be updatable. Static path aggregates are usually
+    cheaper via lca with prefix sums.
+
+- id: trees.decomposition.centroid
+  name: Centroid decomposition
+  aliases: [centroid, divide and conquer on tree]
+  status: canonical
+  prerequisites: [trees.basics.traversal]
+  description: Recursive splitting at centroids, giving O(log n) recursion depth over all paths.
+  discriminator: >
+    Use when counting or aggregating over all vertex pairs, since every path
+    passes through exactly one centroid of its level.
+
+- id: trees.decomposition.small_to_large
+  name: Small-to-large merging
+  aliases: [dsu on tree, sack]
+  status: canonical
+  prerequisites: [trees.basics.traversal]
+  description: Merging child structures into the largest child to bound total work by O(n log n).
+  discriminator: >
+    Use when each vertex needs an answer derived from a multiset over its
+    subtree, and the multiset supports merge but not subtraction.
+
+- id: trees.decomposition.auxiliary_tree
+  name: Virtual tree
+  aliases: [auxiliary tree, compressed tree]
+  status: canonical
+  prerequisites: [trees.ancestors.lca]
+  description: Building a small tree on a query vertex set plus their pairwise LCAs.
+  discriminator: >
+    Use when many queries each name a vertex subset whose sizes sum to
+    something manageable, and per-query work should be proportional to that
+    subset.
+
+# ============================================================= flows =========
+- id: flows
+  name: Flows and cuts
+  status: canonical
+  description: Network flow and the optimization problems that reduce to it.
+
+- id: flows.max_flow
+  name: Maximum flow
+  status: canonical
+  description: Pushing the greatest possible quantity from source to sink.
+
+- id: flows.max_flow.dinic
+  name: Dinic's algorithm
+  aliases: [dinitz, max flow]
+  status: canonical
+  prerequisites: [graphs.traversal.bfs, graphs.traversal.dfs]
+  description: Blocking-flow max flow on the level graph, the practical default.
+  discriminator: >
+    The default max-flow implementation. Tag this when the problem is genuinely
+    a flow rather than a matching in disguise.
+
+- id: flows.max_flow.min_cut
+  name: Minimum cut
+  aliases: [max flow min cut, project selection, closure]
+  status: canonical
+  prerequisites: [flows.max_flow.dinic]
+  description: The cheapest edge set separating source from sink, dual to maximum flow.
+  discriminator: >
+    Use when the problem is a binary partition with penalties for splitting
+    related items. Project selection and closure problems belong here, not
+    under max_flow.
+
+- id: flows.max_flow.min_cost_flow
+  name: Minimum-cost maximum flow
+  aliases: [mcmf, min cost max flow]
+  status: canonical
+  prerequisites: [flows.max_flow.dinic, graphs.shortest_path.potentials]
+  description: Maximum flow of least total cost, via successive shortest augmenting paths.
+  discriminator: >
+    Use when edges carry both capacity and unit cost. If capacities are all one
+    and the graph is bipartite, the Hungarian algorithm is usually simpler.
+
+- id: flows.max_flow.lower_bounds
+  name: Flows with lower bounds
+  aliases: [circulation, feasible flow]
+  status: canonical
+  prerequisites: [flows.max_flow.dinic]
+  description: Feasible circulations when edges must carry at least a given amount.
+  discriminator: >
+    Use when an edge has a minimum as well as a maximum. Recognized by
+    must-use-at-least phrasing that plain max flow cannot express.
+
+- id: flows.applications
+  name: Flow reductions
+  status: canonical
+  description: Combinatorial problems whose solution is a flow model.
+
+- id: flows.applications.bipartite_cover
+  name: Konig duality
+  aliases: [minimum vertex cover, maximum independent set bipartite, konig]
+  status: canonical
+  prerequisites: [graphs.matching.bipartite_kuhn, flows.max_flow.min_cut]
+  description: Minimum vertex cover equals maximum matching in bipartite graphs.
+  discriminator: >
+    Use when the ask is a minimum cover or maximum independent set and the
+    graph is bipartite. The matching is the computation; the duality is the
+    observation.
+
+- id: flows.applications.dilworth
+  name: Dilworth's theorem
+  aliases: [minimum chain cover, antichain]
+  status: canonical
+  prerequisites: [graphs.matching.bipartite_kuhn, graphs.special_graphs.dag]
+  description: Minimum chain cover of a poset equals its longest antichain.
+  discriminator: >
+    Use when partitioning into monotone sequences, or when the answer is the
+    size of the largest mutually incomparable set.
+
+# ================================================================ dp =========
+- id: dp
+  name: Dynamic programming
+  status: canonical
+  description: Solving by combining answers to overlapping subproblems.
+
+- id: dp.basics
+  name: Basic formulations
+  status: canonical
+  description: The standard state shapes.
+
+- id: dp.basics.linear
+  name: Linear DP
+  aliases: [1d dp, prefix dp]
+  status: canonical
+  description: State indexed by a single position in a sequence.
+  discriminator: >
+    The default when processing a sequence left to right with O(1) or O(n)
+    transitions and no second dimension.
+
+- id: dp.basics.knapsack
+  name: Knapsack
+  aliases: [01 knapsack, bounded knapsack, coin change]
+  status: canonical
+  prerequisites: [dp.basics.linear]
+  description: Selecting items under a capacity budget.
+  discriminator: >
+    Use when a weight or budget dimension indexes the state. Unbounded, bounded
+    and 0-1 variants all belong here; the binary-splitting trick for bounded
+    counts does not earn a separate tag.
+
+- id: dp.basics.lis
+  name: Longest increasing subsequence
+  aliases: [lis, patience sorting]
+  status: canonical
+  prerequisites: [dp.basics.linear, search.binary_search.on_answer]
+  description: Longest monotone subsequence, in O(n log n) via patience sorting.
+  discriminator: >
+    Use when the objective is a longest monotone subsequence, including after a
+    reduction that turns pairs into a single ordering.
+
+- id: dp.basics.grid
+  name: Grid DP
+  aliases: [path counting grid, 2d dp]
+  status: canonical
+  prerequisites: [dp.basics.linear]
+  description: State indexed by a cell, transitions from neighbours.
+  discriminator: >
+    Use when the state is literally a grid position. If the grid is wide and
+    the state must carry a frontier, that is dp.subset.broken_profile.
+
+- id: dp.basics.interval
+  name: Interval DP
+  aliases: [range dp, matrix chain]
+  status: canonical
+  prerequisites: [dp.basics.linear]
+  description: State indexed by a subarray, built outward from short intervals.
+  discriminator: >
+    Use when the state is a contiguous range that merges from two adjacent
+    ranges, typically O(n^3) before optimization.
+
+- id: dp.basics.counting
+  name: Counting DP
+  aliases: [combinatorial dp, ways dp]
+  status: canonical
+  prerequisites: [dp.basics.linear]
+  description: Summing over configurations rather than optimizing.
+  discriminator: >
+    Use when the answer is a count modulo something and the recurrence sums
+    rather than takes an extremum.
+
+- id: dp.subset
+  name: Subset DP
+  status: canonical
+  description: State indexed by a bitmask over a small universe.
+
+- id: dp.subset.subset_dp
+  name: Bitmask DP
+  aliases: [bitmask dp, profile over set, tsp dp]
+  status: canonical
+  prerequisites: [dp.basics.linear, bitwise.basics.operators]
+  description: State is a subset of a small ground set, typically at most 20 elements.
+  discriminator: >
+    Recognized by a suspiciously small n in the constraints, around 20. Use
+    when the state must remember which elements were used, not merely how many.
+
+- id: dp.subset.sum_over_subsets
+  name: Sum over subsets
+  aliases: [sos dp, zeta transform, subset sum convolution]
+  status: canonical
+  prerequisites: [bitwise.masks.subset_enumeration, dp.subset.subset_dp]
+  description: Aggregating over all submasks of every mask in O(2^n n) by dimension-wise accumulation.
+  discriminator: >
+    Use when you need, for every mask, an aggregate over all its submasks.
+    Naive submask enumeration is O(3^n); this is the standard speedup.
+
+- id: dp.subset.broken_profile
+  name: Broken profile DP
+  aliases: [plug dp, connection profile]
+  status: canonical
+  prerequisites: [dp.subset.subset_dp, dp.basics.grid]
+  description: Scanning a narrow grid cell by cell, carrying the boundary as a mask.
+  discriminator: >
+    Use when one grid dimension is small, roughly at most 16, and tilings or
+    connectivity across the frontier must be tracked.
+
+- id: dp.tree
+  name: Tree DP
+  status: canonical
+  description: Recurrences over subtrees.
+
+- id: dp.tree.rerooting
+  name: Rerooting
+  aliases: [all roots dp, reroot technique]
+  status: canonical
+  prerequisites: [trees.basics.traversal, dp.basics.linear]
+  description: Computing a subtree DP for every possible root in two passes.
+  discriminator: >
+    Use when the answer is required for every vertex as root, not one. The
+    giveaway is an output of n values where a single DFS gives one.
+
+- id: dp.tree.subtree_dp
+  name: Subtree DP
+  aliases: [dp on trees, tree dp, dp over subtrees]
+  status: canonical
+  prerequisites: [trees.basics.traversal, dp.basics.linear]
+  description: A recurrence whose state is a vertex, combined from its children in one pass.
+  discriminator: >
+    The default DP on a rooted tree. Use rerooting when every vertex must be
+    the root in turn, and tree_knapsack when a budget is shared across
+    subtrees.
+
+- id: dp.tree.tree_knapsack
+  name: Tree knapsack
+  aliases: [dependent knapsack, subtree knapsack]
+  status: canonical
+  prerequisites: [dp.basics.knapsack, trees.basics.traversal]
+  description: Knapsack where item availability follows tree ancestry, merged child by child.
+  discriminator: >
+    Use when a budget is distributed over subtrees. The size-bounded merge
+    giving O(n^2) rather than O(n*k^2) is the detail being tested.
+
+- id: dp.tree.small_to_large_dp
+  name: Merging DP states up a tree
+  aliases: [dsu on tree dp, map merging]
+  status: canonical
+  prerequisites: [trees.decomposition.small_to_large]
+  description: Carrying a mergeable DP state up the tree, always into the larger child.
+  discriminator: >
+    Use when the DP state is a map or multiset rather than a fixed-width array,
+    and the complexity argument is amortized over merges.
+
+- id: dp.digit
+  name: Digit DP
+  status: canonical
+  description: Counting numbers by their decimal or binary representation.
+
+- id: dp.digit.digit_dp
+  name: Digit DP
+  aliases: [digit dynamic programming, count numbers]
+  status: canonical
+  prerequisites: [dp.basics.counting]
+  description: Counting integers in a range satisfying a digit-wise predicate, carrying a tight flag.
+  discriminator: >
+    Recognized by an enormous numeric range, up to 10^18, with a property
+    defined on digits. The tight and leading-zero flags are the implementation
+    burden.
+
+- id: dp.optimization
+  name: DP optimization
+  status: canonical
+  description: Reducing the cost of a transition that is naively too slow.
+
+- id: dp.optimization.convex_hull_trick
+  name: Convex hull trick
+  aliases: [cht, li chao tree, line container]
+  status: canonical
+  prerequisites: [dp.basics.linear, geometry.convexity.convex_hull]
+  description: Maintaining a lower envelope of lines so linear transitions cost O(log n).
+  discriminator: >
+    Use when the transition has the form min over j of a linear function of the
+    current index. If slopes and queries are both monotone, the deque variant
+    drops the log.
+
+- id: dp.optimization.divide_conquer_opt
+  name: Divide and conquer optimization
+  aliases: [dc opt, monotone opt]
+  status: canonical
+  prerequisites: [dp.basics.linear]
+  description: Exploiting monotone optimal split points to compute a DP layer in O(n log n).
+  discriminator: >
+    Use when the optimal transition index is monotone in the state and the DP
+    is layered. Requires no convexity of the cost, unlike knuth_opt.
+
+- id: dp.optimization.knuth_opt
+  name: Knuth optimization
+  aliases: [knuth yao, quadrangle inequality]
+  status: canonical
+  prerequisites: [dp.basics.interval]
+  description: Interval DP in O(n^2) when the cost satisfies the quadrangle inequality.
+  discriminator: >
+    Use specifically on interval DP whose optimal split is sandwiched between
+    the neighbouring intervals' splits. Verify the quadrangle inequality before
+    trusting it.
+
+- id: dp.optimization.aliens_trick
+  name: Aliens trick
+  aliases: [lagrangian relaxation, parametric dp, wqs binary search]
+  status: canonical
+  prerequisites: [dp.basics.linear, search.binary_search.on_answer]
+  description: Removing a count constraint by penalizing each use and binary searching the penalty.
+  discriminator: >
+    Use when a DP is easy except for an exact count of operations, and the
+    answer is convex in that count. Convexity is the precondition people skip.
+
+- id: dp.optimization.slope_trick
+  name: Slope trick
+  aliases: [slope dp, piecewise linear convex dp]
+  status: canonical
+  prerequisites: [data_structures.linear.heap]
+  description: Representing a convex piecewise-linear DP by its slope changes in a heap.
+  discriminator: >
+    Use when the DP value as a function of one parameter is convex piecewise
+    linear and updates are shifts and clamps, typically absolute-difference
+    costs.
+
+- id: dp.optimization.matrix_exponentiation
+  name: Matrix exponentiation
+  aliases: [linear recurrence, matrix power]
+  status: canonical
+  prerequisites: [math.algebra.modular_arithmetic]
+  description: Advancing a linear recurrence by exponentiating its transition matrix.
+  discriminator: >
+    Use when the state count is tiny but the number of steps is astronomically
+    large. The giveaway is a step bound of 10^9 or more with a fixed small
+    state.
+
+- id: dp.automaton
+  name: DP on automata
+  status: canonical
+  description: Recurrences over the states of a string automaton.
+
+- id: dp.automaton.dp_on_aho_corasick
+  name: DP on Aho-Corasick
+  aliases: [aho corasick dp, forbidden substring dp]
+  status: canonical
+  prerequisites: [strings.multi_pattern.aho_corasick, dp.basics.counting]
+  description: Counting strings avoiding or containing patterns by walking the automaton.
+  discriminator: >
+    Use when counting strings against a set of forbidden or required
+    substrings. One pattern only can often be done with a KMP automaton
+    instead.
+
+- id: dp.automaton.dp_on_suffix_automaton
+  name: DP on suffix automaton
+  aliases: [suffix automaton dp, distinct substrings dp]
+  status: canonical
+  prerequisites: [strings.suffix_structures.suffix_automaton]
+  description: Counting or ranking substrings of one string via paths in its suffix automaton.
+  discriminator: >
+    Use when the objects being counted are the distinct substrings of a fixed
+    string, rather than strings drawn from an alphabet.
+
+# =================================================== data_structures =========
+- id: data_structures
+  name: Data structures
+  status: canonical
+  description: Containers whose operations shape the achievable complexity.
+
+- id: data_structures.linear
+  name: Linear structures
+  status: canonical
+  description: Stacks, queues, and their monotone variants.
+
+- id: data_structures.linear.stack
+  name: Stack
+  aliases: [lifo]
+  status: canonical
+  description: Last-in first-out container.
+  discriminator: >
+    Tag only when the stack discipline itself is the idea, such as bracket
+    matching or an explicit recursion unroll.
+
+- id: data_structures.linear.deque
+  name: Deque
+  aliases: [double ended queue]
+  status: canonical
+  description: Container with O(1) insertion and removal at both ends.
+  discriminator: >
+    Tag when both ends are genuinely used, as in zero_one_bfs or a sliding
+    window maximum.
+
+- id: data_structures.linear.heap
+  name: Heap
+  aliases: [priority queue, binary heap]
+  status: canonical
+  description: Container giving O(1) access to the extremum and O(log n) update.
+  discriminator: >
+    Tag when the priority order drives the algorithm and is not merely an
+    implementation detail of a tagged algorithm such as Dijkstra.
+
+- id: data_structures.linear.monotonic_stack
+  name: Monotonic stack
+  aliases: [next greater element, largest rectangle]
+  status: canonical
+  prerequisites: [data_structures.linear.stack]
+  description: A stack kept sorted, yielding nearest greater or smaller elements in linear time.
+  discriminator: >
+    Use when every element needs its nearest dominating neighbour, or when
+    summing over all subarrays by contribution of each element as its extremum.
+
+- id: data_structures.linear.sliding_window
+  name: Sliding window
+  aliases: [two pointers, monotonic deque]
+  status: canonical
+  prerequisites: [data_structures.linear.deque]
+  description: Maintaining an aggregate over a moving contiguous range.
+  discriminator: >
+    Use when the window boundaries both move monotonically. If the predicate is
+    not monotone in window length, this is invalid and a different structure is
+    needed.
+
+- id: data_structures.linear.hash_map
+  name: Hash map
+  aliases: [hash table, frequency map, counting map, prefix sum map]
+  status: canonical
+  description: Associative lookup in expected constant time, and the counting patterns built on it.
+  discriminator: >
+    Use when the solution is to remember how many times a value or a prefix
+    aggregate has been seen. If the keys are ordered and that order matters,
+    a balanced structure is wanted instead.
+
+- id: data_structures.disjoint_set
+  name: Disjoint sets
+  status: canonical
+  description: Maintaining a partition under union.
+
+- id: data_structures.disjoint_set.dsu
+  name: Union-find
+  aliases: [dsu, disjoint set union, union find]
+  status: canonical
+  description: Near-constant-time union and find with path compression and union by rank.
+  discriminator: >
+    The default for incremental connectivity. If connectivity must also be
+    undone, use rollback_dsu.
+
+- id: data_structures.disjoint_set.rollback_dsu
+  name: Rollback DSU
+  aliases: [dsu with rollback, undoable union find]
+  status: canonical
+  prerequisites: [data_structures.disjoint_set.dsu]
+  description: Union-find without path compression, supporting undo of the last union.
+  discriminator: >
+    Use with offline divide and conquer over time, where edges exist during an
+    interval. Path compression must be dropped, which is the usual bug.
+
+- id: data_structures.disjoint_set.weighted_dsu
+  name: Weighted DSU
+  aliases: [dsu with parity, potential dsu, bipartite dsu]
+  status: canonical
+  prerequisites: [data_structures.disjoint_set.dsu]
+  description: Union-find carrying a relative value or parity to the representative.
+  discriminator: >
+    Use when the constraint is a relation between two elements, such as a
+    difference or a parity, rather than mere membership.
+
+- id: data_structures.static_range
+  name: Static range queries
+  status: canonical
+  description: Preprocessing an immutable array for fast range answers.
+
+- id: data_structures.static_range.prefix_sums
+  name: Prefix sums
+  aliases: [cumulative sum, difference array, 2d prefix sum]
+  status: canonical
+  description: Precomputed cumulative aggregates giving O(1) invertible range queries.
+  discriminator: >
+    The first thing to try for static range sums. The difference-array dual,
+    for offline range updates with one final read, belongs here too.
+
+- id: data_structures.static_range.sparse_table
+  name: Sparse table
+  aliases: [rmq, range minimum query]
+  status: canonical
+  prerequisites: [data_structures.static_range.prefix_sums]
+  description: O(n log n) preprocessing for O(1) idempotent range queries.
+  discriminator: >
+    Use for static minimum, maximum, or gcd. Requires idempotence; for sums use
+    prefix_sums, and for updates use a segment tree.
+
+- id: data_structures.range_query
+  name: Dynamic range queries
+  status: canonical
+  description: Structures supporting interleaved updates and range reads.
+
+- id: data_structures.range_query.fenwick
+  name: Fenwick tree
+  aliases: [bit, binary indexed tree]
+  status: canonical
+  prerequisites: [data_structures.static_range.prefix_sums]
+  description: O(log n) point update and prefix query in a compact array.
+  discriminator: >
+    Prefer over a segment tree when the operation is invertible and only prefix
+    aggregates are needed; it is shorter and roughly twice as fast.
+
+- id: data_structures.range_query.segment_tree
+  name: Segment tree
+  aliases: [segtree, range tree]
+  status: canonical
+  prerequisites: [data_structures.static_range.prefix_sums]
+  description: O(log n) range query and point update for any associative operation.
+  discriminator: >
+    The default when the operation is not invertible or the query is not a
+    prefix. Range updates need lazy_propagation.
+
+- id: data_structures.range_query.lazy_propagation
+  name: Lazy propagation
+  aliases: [lazy segment tree, range update range query]
+  status: canonical
+  prerequisites: [data_structures.range_query.segment_tree]
+  description: Deferring range updates at internal nodes so both update and query are O(log n).
+  discriminator: >
+    Use when updates apply to ranges rather than points. The composition law
+    for pending updates is the part that must be reasoned about.
+
+- id: data_structures.range_query.merge_sort_tree
+  name: Merge sort tree
+  aliases: [wavelet tree, k-th in range]
+  status: canonical
+  prerequisites: [data_structures.range_query.segment_tree, search.binary_search.on_answer]
+  description: A segment tree whose nodes hold sorted lists, answering order-statistic range queries.
+  discriminator: >
+    Use for counting elements in a range below a threshold when persistence is
+    unavailable or unnecessary.
+
+- id: data_structures.range_query.persistent
+  name: Persistent segment tree
+  aliases: [functional segment tree, persistence]
+  status: canonical
+  prerequisites: [data_structures.range_query.segment_tree]
+  description: Retaining every historical version by path copying.
+  discriminator: >
+    Use when queries reference an earlier state of the structure, or when a
+    range is expressed as a difference of two prefix versions, the standard
+    k-th smallest trick.
+
+- id: data_structures.range_query.segment_tree_beats
+  name: Segment tree beats
+  aliases: [ji driver segment tree, chmin chmax]
+  status: canonical
+  prerequisites: [data_structures.range_query.lazy_propagation]
+  description: Range chmin and chmax with sum queries, amortized O(n log^2 n).
+  discriminator: >
+    Use only when updates clamp values rather than add to them. Ordinary lazy
+    propagation cannot represent the operation, which is the trigger.
+
+- id: data_structures.offline
+  name: Offline techniques
+  status: canonical
+  description: Reordering queries to make each cheaper.
+
+- id: data_structures.offline.mos
+  name: Mo's algorithm
+  aliases: [mos algorithm, sqrt decomposition on queries]
+  status: canonical
+  prerequisites: [data_structures.sqrt.sqrt_decomposition]
+  description: Sorting queries into blocks so the window moves O((n+q) sqrt n) times.
+  discriminator: >
+    Use when queries are offline ranges and the aggregate supports cheap
+    add-one and remove-one but no merge. If it supports merge, a segment tree
+    is better.
+
+- id: data_structures.offline.cdq
+  name: CDQ divide and conquer
+  aliases: [cdq, offline partial order]
+  status: canonical
+  prerequisites: [data_structures.range_query.fenwick]
+  description: Divide and conquer over time, resolving how earlier updates affect later queries.
+  discriminator: >
+    Use for three-dimensional partial order counting, or when updates and
+    queries interleave and one dimension can be removed by recursion.
+
+- id: data_structures.offline.offline_dsu
+  name: Offline dynamic connectivity
+  aliases: [dynamic connectivity, segment tree on time]
+  status: canonical
+  prerequisites: [data_structures.disjoint_set.rollback_dsu]
+  description: Placing each edge on the time intervals it exists, then DFS over a segment tree on time.
+  discriminator: >
+    Use when edges are both added and removed and all operations are known in
+    advance. Online removal instead requires link-cut trees.
+
+- id: data_structures.sqrt
+  name: Square root techniques
+  status: canonical
+  description: Balancing two costs by choosing a block size.
+
+- id: data_structures.sqrt.sqrt_decomposition
+  name: Sqrt decomposition
+  aliases: [block decomposition, bucket decomposition]
+  status: canonical
+  description: Partitioning into blocks of size about sqrt n so update and query are both O(sqrt n).
+  discriminator: >
+    Use when the operation admits no logarithmic structure. Being slower than a
+    segment tree is acceptable; being expressible at all is the point.
+
+- id: data_structures.sqrt.rebuilding
+  name: Periodic rebuilding
+  aliases: [batch rebuild, sqrt rebuild]
+  status: canonical
+  prerequisites: [data_structures.sqrt.sqrt_decomposition]
+  description: Buffering updates and rebuilding a static structure every sqrt operations.
+  discriminator: >
+    Use when a fast static structure exists but no dynamic one. The buffer must
+    be scanned linearly per query, which sets the block size.
+
+- id: data_structures.trees
+  name: Balanced and specialised trees
+  status: canonical
+  description: Pointer structures with ordering or linking invariants.
+
+- id: data_structures.trees.treap
+  name: Treap and balanced BST
+  aliases: [treap, splay, implicit treap, balanced bst]
+  status: canonical
+  prerequisites: [data_structures.range_query.segment_tree]
+  description: Randomised or amortised balanced trees supporting split and merge.
+  discriminator: >
+    Use when the sequence itself changes shape, through insertion, deletion, or
+    reversal of a range. A segment tree cannot reindex; this can.
+
+- id: data_structures.trees.link_cut
+  name: Link-cut tree
+  aliases: [lct, dynamic trees]
+  status: canonical
+  prerequisites: [trees.decomposition.hld, data_structures.trees.treap]
+  description: Maintaining a forest under link and cut with path queries in amortised O(log n).
+  discriminator: >
+    Use only for online forest modification. If all operations are known in
+    advance, offline_dsu is far simpler.
+
+- id: data_structures.trees.kd_tree
+  name: K-d tree
+  aliases: [kdtree, spatial partition]
+  status: canonical
+  prerequisites: [geometry.primitives.points]
+  description: Recursive spatial partitioning for nearest-neighbour and orthogonal range queries.
+  discriminator: >
+    Use for geometric range or nearest queries where no sweep order exists. The
+    complexity is heuristic, not guaranteed, which limits it to loose bounds.
+
+# =========================================================== strings =========
+- id: strings
+  name: Strings
+  status: canonical
+  description: Techniques on sequences over an alphabet.
+
+- id: strings.hashing
+  name: Hashing
+  status: canonical
+  description: Mapping substrings to comparable integers.
+
+- id: strings.hashing.polynomial_hash
+  name: Polynomial hashing
+  aliases: [rolling hash, rabin karp, string hashing]
+  status: canonical
+  prerequisites: [math.algebra.modular_arithmetic]
+  description: Treating a string as a polynomial in a random base for O(1) substring comparison.
+  discriminator: >
+    The general-purpose substring equality tool. Prefer an exact structure when
+    the problem is adversarial or the checker rewards determinism.
+
+- id: strings.matching
+  name: Single-pattern matching
+  status: canonical
+  description: Locating one pattern inside a text.
+
+- id: strings.matching.kmp
+  name: KMP and prefix function
+  aliases: [kmp, failure function, prefix function, border]
+  status: canonical
+  description: Longest proper border of every prefix, giving linear-time matching.
+  discriminator: >
+    Use when borders or periodicity are the substance, not merely the match
+    positions. Z-function answers a different question about prefix matches.
+
+- id: strings.matching.z_function
+  name: Z-function
+  aliases: [z algorithm, z array]
+  status: canonical
+  description: Length of the longest common prefix of the string with each of its suffixes.
+  discriminator: >
+    Use when the natural question is how far each position agrees with the
+    start. Often interchangeable with KMP, but simpler for prefix-comparison
+    phrasings.
+
+- id: strings.matching.manacher
+  name: Manacher's algorithm
+  aliases: [manacher, palindromic radius]
+  status: canonical
+  description: All maximal palindromic radii in linear time.
+  discriminator: >
+    Use when every palindromic substring centre matters. A single longest
+    palindrome can also be hashed plus binary searched, but this is exact and
+    linear.
+
+- id: strings.multi_pattern
+  name: Multi-pattern matching
+  status: canonical
+  description: Locating many patterns simultaneously.
+
+- id: strings.multi_pattern.trie
+  name: Trie
+  aliases: [prefix tree, retrieval tree]
+  status: canonical
+  description: A tree over the alphabet in which each path spells a prefix.
+  discriminator: >
+    Use when strings are inserted and queried by prefix. If matching must
+    continue past a mismatch, that is aho_corasick.
+
+- id: strings.multi_pattern.aho_corasick
+  name: Aho-Corasick
+  aliases: [aho corasick automaton, dictionary matching]
+  status: canonical
+  prerequisites: [strings.multi_pattern.trie, strings.matching.kmp]
+  description: A trie with failure links, matching a whole dictionary in one pass.
+  discriminator: >
+    Use when a fixed set of patterns is matched against a text or generated
+    strings. Counting generated strings makes it dp_on_aho_corasick.
+
+- id: strings.suffix_structures
+  name: Suffix structures
+  status: canonical
+  description: Indexes over all suffixes of a string.
+
+- id: strings.suffix_structures.suffix_array
+  name: Suffix array
+  aliases: [suffix array, lcp array, kasai]
+  status: canonical
+  prerequisites: [strings.hashing.polynomial_hash]
+  description: Sorted order of all suffixes, usually paired with an LCP array.
+  discriminator: >
+    Use when substrings must be compared in lexicographic order, or when the
+    LCP array turns a substring question into a range question.
+
+- id: strings.suffix_structures.suffix_automaton
+  name: Suffix automaton
+  aliases: [sam, dawg]
+  status: canonical
+  prerequisites: [strings.multi_pattern.trie]
+  description: Minimal automaton recognising all substrings, linear in size.
+  discriminator: >
+    Use when counting or enumerating distinct substrings of one string. For
+    several strings a generalised variant or a suffix array is usually clearer.
+
+- id: strings.suffix_structures.suffix_tree
+  name: Suffix tree
+  aliases: [ukkonen]
+  status: canonical
+  prerequisites: [strings.suffix_structures.suffix_array]
+  description: Compressed trie of all suffixes.
+  discriminator: >
+    Rarely the intended solution; tag only when the tree shape itself is
+    exploited and a suffix array would not serve.
+
+- id: strings.structure
+  name: String structure
+  status: canonical
+  description: Periodicity, borders, and canonical forms.
+
+- id: strings.structure.periodicity
+  name: Periodicity
+  aliases: [period, border array, repetition]
+  status: canonical
+  prerequisites: [strings.matching.kmp]
+  description: Repetition structure of a string and the borders that witness it.
+  discriminator: >
+    Use when the answer is a period or a repetition count, rather than a match
+    position.
+
+- id: strings.structure.lyndon
+  name: Lyndon words and minimal rotation
+  aliases: [booth, duval, smallest rotation]
+  status: canonical
+  description: Factorisation into non-increasing Lyndon words, and least cyclic rotation.
+  discriminator: >
+    Use when rotations must be canonicalised, or when a greedy factorisation
+    into strictly minimal pieces is needed.
+
+# ============================================================== math =========
+- id: math
+  name: Mathematics
+  status: canonical
+  description: General mathematical technique not specific to number theory.
+
+- id: math.algebra
+  name: Algebra
+  status: canonical
+  description: Manipulation in rings, fields, and modular systems.
+
+- id: math.algebra.modular_arithmetic
+  name: Modular arithmetic
+  aliases: [modpow, modular inverse, fermat little theorem]
+  status: canonical
+  description: Arithmetic modulo a fixed integer, including inverses and fast exponentiation.
+  discriminator: >
+    Tag when modular reasoning is load bearing, not merely when the answer is
+    printed modulo a prime.
+
+- id: math.algebra.linear_algebra
+  name: Linear algebra
+  aliases: [gaussian elimination, matrix rank, determinant]
+  status: canonical
+  prerequisites: [math.algebra.modular_arithmetic]
+  description: Solving linear systems and computing rank or determinant, over the reals or a finite field.
+  discriminator: >
+    Use when the model is a system of equations. Over GF(2) with xor
+    constraints, consider bitwise.structures.linear_basis instead.
+
+- id: math.algebra.polynomials
+  name: Polynomials
+  aliases: [fft, ntt, convolution, lagrange interpolation]
+  status: canonical
+  prerequisites: [math.algebra.modular_arithmetic]
+  description: Convolution by FFT or NTT, interpolation, and formal power series operations.
+  discriminator: >
+    Use when the answer is a convolution of two sequences, or when a
+    polynomial-valued prefix must be evaluated at a large argument.
+
+- id: math.numerical
+  name: Numerical methods
+  status: canonical
+  description: Approximate computation over the reals.
+
+- id: math.numerical.ternary_search
+  name: Ternary search
+  aliases: [unimodal search, golden section]
+  status: canonical
+  description: Locating the extremum of a unimodal function by interval narrowing.
+  discriminator: >
+    Use when the objective is provably unimodal in one variable. Monotone
+    predicates instead call for binary search.
+
+- id: math.numerical.simulation
+  name: Numerical simulation and iteration
+  aliases: [newton method, fixed point iteration]
+  status: canonical
+  description: Converging to an answer by repeated refinement.
+  discriminator: >
+    Use when no closed form exists and the iteration's convergence is the
+    argument for correctness.
+
+- id: math.game_adjacent
+  name: Mathematical structure
+  status: canonical
+  description: Invariants, parity, and pigeonhole arguments.
+
+- id: math.game_adjacent.invariants
+  name: Invariants and monovariants
+  aliases: [parity argument, potential function]
+  status: canonical
+  description: A quantity preserved or monotone under the allowed operations.
+  discriminator: >
+    Use when the solution is a proof that some quantity cannot change, rather
+    than a construction or a search.
+
+- id: math.game_adjacent.pigeonhole
+  name: Pigeonhole and extremal arguments
+  aliases: [pigeonhole principle, extremal principle]
+  status: canonical
+  description: Deriving existence from counting rather than construction.
+  discriminator: >
+    Use when the bound in the constraints is suspiciously just large enough to
+    force a collision or a repeat.
+
+# ===================================================== number_theory =========
+- id: number_theory
+  name: Number theory
+  status: canonical
+  description: Divisibility, primes, and congruences.
+
+- id: number_theory.primes
+  name: Primes
+  status: canonical
+  description: Generation, testing, and factorisation.
+
+- id: number_theory.primes.sieve
+  name: Sieve of Eratosthenes
+  aliases: [linear sieve, smallest prime factor sieve]
+  status: canonical
+  description: Precomputing primality or least prime factor up to a bound.
+  discriminator: >
+    The default when many numbers below a shared bound must be factorised. A
+    single large number instead wants trial division or Pollard rho.
+
+- id: number_theory.primes.factorization
+  name: Factorisation
+  aliases: [pollard rho, miller rabin, trial division]
+  status: canonical
+  prerequisites: [number_theory.primes.sieve]
+  description: Splitting a single integer into prime powers, by trial division or Pollard rho.
+  discriminator: >
+    Use when the number to factorise is large, beyond sieve range. Miller-Rabin
+    for primality belongs here as its companion.
+
+- id: number_theory.divisibility
+  name: Divisibility
+  status: canonical
+  description: GCD, congruences, and the structures built on them.
+
+- id: number_theory.divisibility.gcd
+  name: GCD and extended Euclid
+  aliases: [euclidean algorithm, extended gcd, bezout, diophantine]
+  status: canonical
+  description: Greatest common divisor and the Bezout coefficients that accompany it.
+  discriminator: >
+    Use when the answer is a gcd, a linear Diophantine solution, or a modular
+    inverse for a non-prime modulus.
+
+- id: number_theory.divisibility.crt
+  name: Chinese remainder theorem
+  aliases: [crt, simultaneous congruences]
+  status: canonical
+  prerequisites: [number_theory.divisibility.gcd]
+  description: Combining congruences with coprime, or merged non-coprime, moduli.
+  discriminator: >
+    Use when several modular constraints must hold at once. Also the standard
+    way to recover a large result from several NTT primes.
+
+- id: number_theory.divisibility.multiplicative
+  name: Multiplicative functions
+  aliases: [euler phi, mobius, divisor function, dirichlet convolution]
+  status: canonical
+  prerequisites: [number_theory.primes.sieve]
+  description: Functions determined by prime powers, and their sieving.
+  discriminator: >
+    Use when the summand depends on the factorisation of the index. Inclusion
+    and exclusion over divisors usually means Mobius.
+
+- id: number_theory.divisibility.mobius_inversion
+  name: Mobius inversion
+  aliases: [mobius inversion, coprime counting]
+  status: canonical
+  prerequisites: [number_theory.divisibility.multiplicative]
+  description: Inverting divisor sums to count coprime or gcd-constrained pairs.
+  discriminator: >
+    Use when counting pairs with a given gcd. The inversion is the step that
+    turns an O(n^2) count into a divisor sum.
+
+- id: number_theory.discrete_log
+  name: Discrete logarithms and roots
+  status: canonical
+  description: Solving exponential congruences.
+
+- id: number_theory.discrete_log.bsgs
+  name: Baby-step giant-step
+  aliases: [bsgs, discrete log]
+  status: canonical
+  prerequisites: [math.algebra.modular_arithmetic]
+  description: Meet-in-the-middle solution of a discrete logarithm in O(sqrt m).
+  discriminator: >
+    Use when the unknown is an exponent in a modular equation. Primitive roots
+    and discrete roots reduce to this.
+
+# ====================================================== combinatorics =========
+- id: combinatorics
+  name: Combinatorics
+  status: canonical
+  description: Counting structures.
+
+- id: combinatorics.basics
+  name: Basic counting
+  status: canonical
+  description: Binomials, factorials, and standard sequences.
+
+- id: combinatorics.basics.binomials
+  name: Binomial coefficients
+  aliases: [pascal triangle, n choose k, lucas theorem]
+  status: canonical
+  prerequisites: [math.algebra.modular_arithmetic]
+  description: Choosing k from n, with modular precomputation and Lucas for prime moduli.
+  discriminator: >
+    Tag when the counting argument itself is the difficulty, not when a
+    binomial merely appears in a larger formula.
+
+- id: combinatorics.basics.catalan
+  name: Catalan and ballot numbers
+  aliases: [catalan number, reflection principle, dyck path]
+  status: canonical
+  prerequisites: [combinatorics.basics.binomials]
+  description: Counting balanced structures via the reflection principle.
+  discriminator: >
+    Use when counting bracket sequences, triangulations, or monotone paths kept
+    on one side of a diagonal.
+
+- id: combinatorics.inclusion_exclusion
+  name: Inclusion and exclusion
+  status: canonical
+  description: Counting by alternating over constraint subsets.
+
+- id: combinatorics.inclusion_exclusion.pie
+  name: Inclusion-exclusion principle
+  aliases: [pie, complementary counting, derangement]
+  status: canonical
+  prerequisites: [combinatorics.basics.binomials]
+  description: Alternating sum over subsets of forbidden conditions.
+  discriminator: >
+    Use when at-least is easy but exactly is hard. If the subsets are bitmasks
+    over a small set, the implementation is dp.subset.sum_over_subsets.
+
+- id: combinatorics.inclusion_exclusion.burnside
+  name: Burnside and Polya counting
+  aliases: [burnside lemma, polya enumeration, necklace counting]
+  status: canonical
+  prerequisites: [combinatorics.basics.binomials, number_theory.divisibility.gcd]
+  description: Counting orbits under a group action by averaging fixed points.
+  discriminator: >
+    Use when configurations equivalent under rotation or reflection must be
+    counted once.
+
+- id: combinatorics.generating
+  name: Generating functions
+  status: canonical
+  description: Encoding sequences as formal power series.
+
+- id: combinatorics.generating.gf
+  name: Generating functions
+  aliases: [ogf, egf, formal power series]
+  status: canonical
+  prerequisites: [math.algebra.polynomials]
+  description: Manipulating counting sequences through their generating series.
+  discriminator: >
+    Use when a convolution structure in the recurrence is clearer as a product
+    of series, especially when a closed form or an FFT follows.
+
+# ========================================================== geometry =========
+- id: geometry
+  name: Geometry
+  status: canonical
+  description: Computation with points, lines, and shapes.
+
+- id: geometry.primitives
+  name: Primitives
+  status: canonical
+  description: The vector operations everything else is built from.
+
+- id: geometry.primitives.points
+  name: Points and vectors
+  aliases: [cross product, dot product, orientation]
+  status: canonical
+  description: Cross and dot products, orientation tests, and distances.
+  discriminator: >
+    Tag when orientation or projection is the whole content. Anything heavier
+    should carry a more specific tag as well.
+
+- id: geometry.primitives.segments
+  name: Segment and line intersection
+  aliases: [line intersection, segment intersection]
+  status: canonical
+  prerequisites: [geometry.primitives.points]
+  description: Testing and computing intersections, with care for degenerate cases.
+  discriminator: >
+    Use when the difficulty is in the case analysis of collinear and touching
+    configurations.
+
+- id: geometry.primitives.polygon
+  name: Polygon properties
+  aliases: [shoelace, point in polygon, area]
+  status: canonical
+  prerequisites: [geometry.primitives.points]
+  description: Area, containment, and winding for simple polygons.
+  discriminator: >
+    Use for area and containment on a given polygon. Constructing the polygon
+    from a point set is convex_hull.
+
+- id: geometry.convexity
+  name: Convexity
+  status: canonical
+  description: Hulls and the optimisation they enable.
+
+- id: geometry.convexity.convex_hull
+  name: Convex hull
+  aliases: [andrew monotone chain, graham scan, hull]
+  status: canonical
+  prerequisites: [geometry.primitives.points]
+  description: Smallest convex polygon containing a point set.
+  discriminator: >
+    Use when only extreme points matter. If the hull is then queried in a
+    direction, add rotating_calipers or the CHT tag as appropriate.
+
+- id: geometry.convexity.rotating_calipers
+  name: Rotating calipers
+  aliases: [diameter of point set, antipodal pairs]
+  status: canonical
+  prerequisites: [geometry.convexity.convex_hull]
+  description: Sweeping antipodal pairs around a hull for width, diameter, and minimal bounding boxes.
+  discriminator: >
+    Use when an extremal pair or a supporting-line quantity over a hull is
+    needed in linear time after the hull is built.
+
+- id: geometry.convexity.half_plane
+  name: Half-plane intersection
+  aliases: [halfplane intersection, linear programming 2d]
+  status: canonical
+  prerequisites: [geometry.convexity.convex_hull]
+  description: The convex region satisfying a set of linear inequalities.
+  discriminator: >
+    Use when the feasible region of two-dimensional linear constraints must be
+    constructed, rather than optimised over by ternary search.
+
+- id: geometry.sweep
+  name: Sweep techniques
+  status: canonical
+  description: Ordering events along an axis.
+
+- id: geometry.sweep.line_sweep
+  name: Line sweep
+  aliases: [sweep line, event ordering, area of union]
+  status: canonical
+  prerequisites: [geometry.primitives.segments, data_structures.range_query.segment_tree]
+  description: Processing events in coordinate order while maintaining an active set.
+  discriminator: >
+    Use when the objects are intervals or rectangles and the answer accumulates
+    as a line passes over them.
+
+- id: geometry.sweep.closest_pair
+  name: Closest pair
+  aliases: [closest pair of points, divide and conquer geometry]
+  status: canonical
+  prerequisites: [geometry.primitives.points]
+  description: Nearest two points in O(n log n) by divide and conquer or a strip sweep.
+  discriminator: >
+    Use for the specific nearest-pair question; the strip argument is what the
+    problem is testing.
+
+# =========================================================== greedy ==========
+- id: greedy
+  name: Greedy
+  status: canonical
+  description: Building a solution by locally optimal choices that provably globally suffice.
+
+- id: greedy.exchange
+  name: Exchange arguments
+  status: canonical
+  description: Correctness by showing any solution can be transformed into the greedy one.
+
+- id: greedy.exchange.sorting_order
+  name: Greedy sorting order
+  aliases: [exchange argument, scheduling order, custom comparator]
+  status: canonical
+  description: Choosing a processing order justified by a pairwise exchange argument.
+  discriminator: >
+    Use when the whole solution is a sort by a non-obvious key. The comparator's
+    transitivity is what must be argued.
+
+- id: greedy.exchange.scheduling
+  name: Scheduling and deadlines
+  aliases: [job scheduling, deadline greedy, exchange with heap]
+  status: canonical
+  prerequisites: [data_structures.linear.heap, greedy.exchange.sorting_order]
+  description: Selecting or ordering tasks under deadlines, often with a regret heap.
+  discriminator: >
+    Use when items have deadlines or penalties and an earlier choice may be
+    withdrawn later, which is what the heap implements.
+
+- id: greedy.intervals
+  name: Interval greedy
+  status: canonical
+  description: Selection and covering on the line.
+
+- id: greedy.intervals.selection
+  name: Interval selection and covering
+  aliases: [activity selection, minimum interval cover, stabbing]
+  status: canonical
+  prerequisites: [greedy.exchange.sorting_order]
+  description: Choosing a maximum disjoint set or minimum covering set of intervals.
+  discriminator: >
+    Use when sorting by right endpoint, or by left endpoint with a heap, settles
+    the problem. Weighted variants are usually DP instead.
+
+# =========================================================== search ==========
+- id: search
+  name: Search
+  status: canonical
+  description: Systematic exploration of a solution space.
+
+- id: search.binary_search
+  name: Binary search
+  status: canonical
+  description: Halving on a monotone predicate.
+
+- id: search.binary_search.on_answer
+  name: Binary search on the answer
+  aliases: [parametric search, binary search the answer, minimize maximum]
+  status: canonical
+  description: Converting an optimisation into a feasibility test that is monotone in the parameter.
+  discriminator: >
+    Recognized by minimise-the-maximum or maximise-the-minimum phrasing. The
+    work is in the feasibility check, not the search.
+
+- id: search.binary_search.parallel
+  name: Parallel binary search
+  aliases: [offline binary search, integrated binary search]
+  status: canonical
+  prerequisites: [search.binary_search.on_answer, data_structures.range_query.fenwick]
+  description: Advancing many independent binary searches together, one predicate sweep per level.
+  discriminator: >
+    Use when each of many queries needs its own binary search over a shared
+    timeline, and rebuilding the structure per query is too slow.
+
+- id: search.exhaustive
+  name: Exhaustive search
+  status: canonical
+  description: Enumerating the space with pruning.
+
+- id: search.exhaustive.backtracking
+  name: Backtracking
+  aliases: [dfs search, pruning, recursive enumeration]
+  status: canonical
+  prerequisites: [graphs.traversal.dfs]
+  description: Depth-first construction with early abandonment of infeasible prefixes.
+  discriminator: >
+    Use when constraints are small and pruning carries the complexity. If the
+    state can be memoised, it is DP instead.
+
+- id: search.exhaustive.meet_in_middle
+  name: Meet in the middle
+  aliases: [mitm, split search]
+  status: canonical
+  prerequisites: [search.exhaustive.backtracking]
+  description: Splitting the space in half, enumerating each, and joining the halves.
+  discriminator: >
+    Recognized by n around 40, twice the bitmask threshold. The join step is
+    usually a sort plus binary search.
+
+- id: search.exhaustive.iterative_deepening
+  name: Iterative deepening and A*
+  aliases: [ida star, a star, heuristic search]
+  status: canonical
+  prerequisites: [search.exhaustive.backtracking, graphs.shortest_path.dijkstra]
+  description: Bounded-depth search repeated with growing bounds, optionally guided by a heuristic.
+  discriminator: >
+    Use when the state space is huge but the answer is shallow, and an
+    admissible heuristic exists. Puzzle problems are the usual home.
+
+# ========================================================== bitwise ==========
+- id: bitwise
+  name: Bitwise techniques
+  status: canonical
+  description: Working with the binary representation directly.
+
+- id: bitwise.basics
+  name: Basics
+  status: canonical
+  description: The operators and the counting primitives.
+
+- id: bitwise.basics.operators
+  name: Bit operators
+  aliases: [and or xor, bit manipulation]
+  status: canonical
+  description: Conjunction, disjunction, exclusive or, and negation on integers.
+  discriminator: >
+    Tag when the identities themselves carry the solution, for example when xor
+    is used as an invertible accumulator.
+
+- id: bitwise.basics.popcount
+  name: Population count
+  aliases: [popcount, hamming weight]
+  status: canonical
+  prerequisites: [bitwise.basics.operators]
+  description: Counting set bits, and grouping states by that count.
+  discriminator: >
+    Tag when set-bit count indexes the state or the answer, rather than being
+    an incidental call.
+
+- id: bitwise.basics.shifts
+  name: Shifts and powers of two
+  aliases: [bit shift, highest bit, lowbit]
+  status: canonical
+  prerequisites: [bitwise.basics.operators]
+  description: Shifting, isolating the lowest set bit, and locating the highest.
+  discriminator: >
+    Tag when binary place value drives the algorithm, such as processing bits
+    from high to low.
+
+- id: bitwise.masks
+  name: Mask enumeration
+  status: canonical
+  description: Iterating over related subsets efficiently.
+
+- id: bitwise.masks.subset_enumeration
+  name: Subset enumeration
+  aliases: [enumerate subsets, iterate masks]
+  status: canonical
+  prerequisites: [bitwise.basics.operators]
+  description: Iterating over all subsets of a ground set.
+  discriminator: >
+    Use for a plain pass over all masks. Iterating only within a mask is
+    submask_enumeration.
+
+- id: bitwise.masks.submask_enumeration
+  name: Submask enumeration
+  aliases: [submask iteration, 3^n]
+  status: canonical
+  prerequisites: [bitwise.masks.subset_enumeration]
+  description: Iterating the submasks of each mask, O(3^n) in total.
+  discriminator: >
+    Use when a mask must be partitioned into two parts. If only an aggregate
+    over submasks is needed, sum_over_subsets is asymptotically better.
+
+- id: bitwise.masks.superset_enumeration
+  name: Superset enumeration
+  aliases: [supermask iteration]
+  status: canonical
+  prerequisites: [bitwise.masks.submask_enumeration]
+  description: Iterating the supersets of each mask.
+  discriminator: >
+    The dual of submask enumeration; use when the aggregation direction runs
+    from specific configurations to general ones.
+
+- id: bitwise.structures
+  name: Bit structures
+  status: canonical
+  description: Containers organised around binary representation.
+
+- id: bitwise.structures.trie_xor
+  name: Binary trie
+  aliases: [xor trie, binary trie, maximum xor]
+  status: canonical
+  prerequisites: [strings.multi_pattern.trie, bitwise.basics.shifts]
+  description: A trie over bits, answering maximum-xor and xor-threshold queries greedily.
+  discriminator: >
+    Use when the objective is an extremal xor against a set. Linear independence
+    over GF(2) instead calls for linear_basis.
+
+- id: bitwise.structures.linear_basis
+  name: Linear basis
+  aliases: [xor basis, gf2 basis, gaussian elimination xor]
+  status: canonical
+  prerequisites: [bitwise.basics.shifts, math.algebra.linear_algebra]
+  description: A reduced basis of a set under xor, spanning all achievable values.
+  discriminator: >
+    Use when any subset may be xored and the question is which values are
+    reachable, or the k-th such value.
+
+- id: bitwise.techniques
+  name: Bit techniques
+  status: canonical
+  description: Representation tricks that change the complexity class.
+
+- id: bitwise.techniques.bitset_optimization
+  name: Bitset optimisation
+  aliases: [bitset, word parallelism, 64x speedup]
+  status: canonical
+  prerequisites: [bitwise.basics.operators]
+  description: Packing boolean state into machine words for a constant-factor division by the word size.
+  discriminator: >
+    Use when an O(n^2) or O(nm) boolean DP is just too slow and the transition
+    is a shift or a mask.
+
+- id: bitwise.techniques.xor_prefix
+  name: XOR prefix
+  aliases: [prefix xor, xor range]
+  status: canonical
+  prerequisites: [bitwise.basics.operators, data_structures.static_range.prefix_sums]
+  description: Prefix aggregation under xor, exploiting self-inverseness.
+  discriminator: >
+    Use when subarray xor is the quantity of interest, typically paired with a
+    hash map over prefix values.
+
+- id: bitwise.techniques.gray_code
+  name: Gray code
+  aliases: [reflected binary code]
+  status: canonical
+  prerequisites: [bitwise.basics.operators]
+  description: Orderings of masks in which consecutive entries differ in one bit.
+  discriminator: >
+    Use when an enumeration must change one element at a time, or when a
+    construction requires a Hamiltonian path on the hypercube.
+
+# ====================================================== game_theory ==========
+- id: game_theory
+  name: Game theory
+  status: canonical
+  description: Optimal play in combinatorial games.
+
+- id: game_theory.impartial
+  name: Impartial games
+  status: canonical
+  description: Games where both players have the same moves.
+
+- id: game_theory.impartial.sprague_grundy
+  name: Sprague-Grundy
+  aliases: [grundy number, nim value, mex]
+  status: canonical
+  prerequisites: [dp.basics.linear]
+  description: Assigning nim-values to positions so independent games add by xor.
+  discriminator: >
+    Use when a position decomposes into independent subgames. A single game
+    with no decomposition just needs a win-lose DP.
+
+- id: game_theory.impartial.nim
+  name: Nim and variants
+  aliases: [nim, misere nim, staircase nim]
+  status: canonical
+  prerequisites: [game_theory.impartial.sprague_grundy]
+  description: The canonical impartial game and the reductions that map onto it.
+  discriminator: >
+    Use when the game is literally piles, or reduces to piles after an
+    observation such as pairing or parity of position.
+
+- id: game_theory.partisan
+  name: Partisan and economic games
+  status: canonical
+  description: Games where the players differ.
+
+- id: game_theory.partisan.minimax_dp
+  name: Minimax DP
+  aliases: [game dp, alternating turns dp, optimal play dp]
+  status: canonical
+  prerequisites: [dp.basics.interval]
+  description: DP over positions where the optimising player alternates.
+  discriminator: >
+    Use when the two players have different move sets or different objectives,
+    so Grundy theory does not apply.
+
+# ===================================================== optimization ==========
+- id: optimization
+  name: Optimization
+  status: canonical
+  description: Formal optimisation models.
+
+- id: optimization.linear
+  name: Linear models
+  status: canonical
+  description: Objectives and constraints that are linear.
+
+- id: optimization.linear.lp_duality
+  name: Linear programming and duality
+  aliases: [simplex, lp, dual]
+  status: canonical
+  prerequisites: [math.algebra.linear_algebra]
+  description: Optimising a linear objective under linear constraints, and reading the dual.
+  discriminator: >
+    Use when the model is genuinely an LP. In contest settings the dual is
+    usually the point, turning the problem into a flow or a cut.
+
+- id: optimization.local
+  name: Local search
+  status: canonical
+  description: Improving a solution by perturbation.
+
+- id: optimization.local.annealing
+  name: Simulated annealing and hill climbing
+  aliases: [simulated annealing, hill climbing, local search]
+  status: canonical
+  prerequisites: [randomized.randomization.random_choice]
+  description: Accepting worsening moves with decaying probability to escape local optima.
+  discriminator: >
+    Use on scored optimisation problems with no exact solution expected. The
+    format column reading optimization is the strongest signal.
+
+# ====================================================== randomized ===========
+- id: randomized
+  name: Randomized techniques
+  status: canonical
+  description: Algorithms whose correctness or complexity is probabilistic.
+
+- id: randomized.randomization
+  name: Randomization
+  status: canonical
+  description: Introducing randomness deliberately.
+
+- id: randomized.randomization.random_choice
+  name: Random sampling
+  aliases: [random shuffle, random restart, monte carlo]
+  status: canonical
+  description: Sampling to succeed with high probability, or to defeat adversarial input.
+  discriminator: >
+    Use when the complexity argument is a probability bound, such as sampling
+    candidates for a majority element.
+
+- id: randomized.randomization.hashing_tricks
+  name: Randomized hashing
+  aliases: [zobrist hashing, xor hashing, random labels]
+  status: canonical
+  prerequisites: [strings.hashing.polynomial_hash]
+  description: Assigning random labels so set equality becomes integer equality.
+  discriminator: >
+    Use when multisets or subtrees must be compared for equality and an exact
+    canonical form is too expensive.
+
+# ============================================================ adhoc ==========
+- id: adhoc
+  name: Ad hoc
+  status: canonical
+  description: Problems whose solution is an observation rather than a named technique.
+
+- id: adhoc.constructive
+  name: Constructive
+  status: canonical
+  description: Exhibiting an object meeting the constraints.
+
+- id: adhoc.constructive.construction
+  name: Constructive algorithms
+  aliases: [construct an answer, explicit construction]
+  status: canonical
+  description: Building a valid configuration directly, usually by an inductive pattern.
+  discriminator: >
+    Use when the output is any valid object rather than an optimum, and the
+    work is finding a pattern that scales.
+
+- id: adhoc.constructive.interactive
+  name: Interactive strategy
+  aliases: [interactive problem, query strategy, guessing game]
+  status: canonical
+  prerequisites: [search.binary_search.on_answer]
+  description: Designing a query strategy against a grader within a query budget.
+  discriminator: >
+    Use when the query budget is the real constraint. The budget's shape,
+    typically a logarithm, names the intended strategy.
+
+- id: adhoc.simulation
+  name: Simulation
+  status: canonical
+  description: Executing the stated process directly.
+
+- id: adhoc.simulation.direct
+  name: Direct simulation
+  aliases: [implementation, brute force, straightforward]
+  status: canonical
+  description: Doing exactly what the statement describes, within bounds.
+  discriminator: >
+    Use when there is no algorithmic idea and the difficulty, if any, is in
+    careful reading and bookkeeping.
+
+- id: adhoc.simulation.sorting
+  name: Sort and scan
+  aliases: [sorting, sort then sweep, custom sort]
+  status: canonical
+  description: Sorting the input, after which one linear pass answers the question.
+  discriminator: >
+    Use when sorting is the whole algorithm and no exchange argument is being
+    made. If the sort key itself is the insight and needs proof, that is
+    greedy.exchange.sorting_order.

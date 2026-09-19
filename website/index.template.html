@@ -1,0 +1,664 @@
+<style>
+:root {
+  --bg: #ffffff;
+  --ink: #000000;
+  --ink-2: #333333;
+  --muted: #767676;
+  --faint: #a6a6a6;
+  --line: #d9d9d9;
+  --line-soft: #ececec;
+  --fill: #f2f2f2;
+  --inv-bg: #000000;
+  --inv-ink: #ffffff;
+  --heat: 0, 0, 0;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b0b0b;
+    --ink: #ffffff;
+    --ink-2: #d4d4d4;
+    --muted: #8f8f8f;
+    --faint: #5c5c5c;
+    --line: #333333;
+    --line-soft: #1f1f1f;
+    --fill: #161616;
+    --inv-bg: #ffffff;
+    --inv-ink: #000000;
+    --heat: 255, 255, 255;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0b0b0b;
+  --ink: #ffffff;
+  --ink-2: #d4d4d4;
+  --muted: #8f8f8f;
+  --faint: #5c5c5c;
+  --line: #333333;
+  --line-soft: #1f1f1f;
+  --fill: #161616;
+  --inv-bg: #ffffff;
+  --inv-ink: #000000;
+  --heat: 255, 255, 255;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px 56px; }
+
+.masthead {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 24px;
+  padding: 30px 0 10px;
+}
+h1 { font-size: 24px; font-weight: 700; letter-spacing: -.015em; margin: 0; }
+
+.sitenav { display: flex; align-items: baseline; gap: 12px; margin-left: auto; font-size: 12.5px; }
+.sitenav .lead { color: var(--faint); }
+.sitenav a { color: var(--muted); text-decoration: none; }
+.sitenav a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
+.sitenav button {
+  appearance: none; background: none; border: 0; padding: 0; cursor: pointer;
+  font: inherit; font-size: 12.5px; color: var(--muted);
+  text-decoration: underline; text-underline-offset: 2px;
+}
+.sitenav button:hover { color: var(--ink); }
+.sitenav .site-identity { color: var(--faint); font-family: "IBM Plex Mono", monospace; font-size: 11.5px; }
+
+.figures { display: flex; gap: 22px; flex-wrap: wrap; padding-bottom: 16px; }
+.figure {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px; font-variant-numeric: tabular-nums; color: var(--muted);
+}
+.figure b { color: var(--ink); font-weight: 600; }
+
+.tabs { display: flex; border-bottom: 1px solid var(--line); margin-bottom: 18px; }
+.tab {
+  appearance: none; background: none; border: 0; border-bottom: 2px solid transparent;
+  padding: 9px 0; margin: 0 22px -1px 0; cursor: pointer;
+  font: inherit; font-size: 14px; font-weight: 500; color: var(--muted);
+}
+.tab:hover { color: var(--ink); }
+.tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); }
+
+.controls {
+  display: grid; gap: 12px 20px; margin-bottom: 4px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+.field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.field > label {
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--muted); font-weight: 600;
+}
+input[type="search"], select {
+  font: inherit; font-size: 13px; color: var(--ink); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 0; padding: 6px 8px; width: 100%;
+}
+input[type="search"]:focus-visible, select:focus-visible,
+button:focus-visible, summary:focus-visible {
+  outline: 2px solid var(--ink); outline-offset: 1px;
+}
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  appearance: none; font: inherit; font-size: 12.5px; cursor: pointer;
+  background: var(--bg); color: var(--ink-2);
+  border: 1px solid var(--line); border-radius: 0; padding: 4px 10px;
+}
+.chip:hover { border-color: var(--ink); color: var(--ink); }
+.chip[aria-pressed="true"] {
+  background: var(--inv-bg); color: var(--inv-ink); border-color: var(--inv-bg);
+}
+.chip .n { font-family: "IBM Plex Mono", monospace; font-size: 11px; opacity: .65; }
+.range { display: flex; align-items: center; gap: 8px; }
+.range select { width: auto; flex: 1; }
+.range span { color: var(--muted); font-size: 12px; }
+
+.resultbar {
+  display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap;
+  margin: 18px 0 8px; color: var(--muted); font-size: 12.5px;
+}
+.resultbar strong {
+  color: var(--ink); font-family: "IBM Plex Mono", monospace;
+  font-variant-numeric: tabular-nums; font-weight: 600;
+}
+.linkish {
+  appearance: none; background: none; border: 0; padding: 0; cursor: pointer;
+  font: inherit; font-size: 12.5px; color: var(--ink);
+  text-decoration: underline; text-underline-offset: 2px;
+}
+
+.tablewrap { overflow-x: auto; border-top: 1px solid var(--line); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+thead th {
+  position: sticky; top: 0; z-index: 2; text-align: left; background: var(--bg);
+  color: var(--muted); font-size: 10.5px; text-transform: uppercase;
+  letter-spacing: .08em; font-weight: 600;
+  padding: 8px 14px 8px 0; border-bottom: 1px solid var(--line); white-space: nowrap;
+}
+thead th:last-child { padding-right: 0; }
+tbody td {
+  padding: 9px 14px 9px 0; border-top: 1px solid var(--line-soft); vertical-align: baseline;
+}
+tbody td:last-child { padding-right: 0; }
+tbody tr:hover { background: var(--fill); }
+.t-title { font-weight: 500; }
+.t-title a { color: var(--ink); text-decoration: none; }
+.t-title a:hover { text-decoration: underline; text-underline-offset: 2px; }
+.t-title .meta {
+  display: block; color: var(--muted); font-size: 11.5px; font-weight: 400;
+  font-family: "IBM Plex Mono", monospace;
+}
+.tagbtn {
+  appearance: none; background: none; border: 0; padding: 0; cursor: pointer;
+  font-family: "IBM Plex Mono", monospace; font-size: 11.5px;
+  color: var(--ink-2); text-align: left;
+}
+.tagbtn:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
+.tagbtn.approx { color: var(--faint); }
+.untagged { font-family: "IBM Plex Mono", monospace; font-size: 11.5px; color: var(--faint); }
+.num {
+  font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+}
+.num.dim { color: var(--faint); }
+.canon {
+  font-family: "IBM Plex Mono", monospace; font-size: 10px; letter-spacing: .04em;
+  color: var(--muted); margin-left: 7px; white-space: nowrap; text-transform: uppercase;
+}
+.status { white-space: nowrap; font-size: 12.5px; color: var(--faint); }
+.status.done { color: var(--ink); }
+.empty { padding: 40px 0; text-align: center; color: var(--muted); }
+
+.covwrap { overflow-x: auto; border-top: 1px solid var(--line); }
+table.cov { font-size: 12px; }
+table.cov thead th { padding: 8px 0; text-align: center; }
+table.cov thead th.rowhead { text-align: left; min-width: 290px; }
+table.cov th.rowhead {
+  font-family: "IBM Plex Mono", monospace; font-weight: 400; font-size: 11.5px;
+  color: var(--ink-2); padding: 3px 14px 3px 0; white-space: nowrap;
+  text-transform: none; letter-spacing: 0; position: static; background: none;
+  border-bottom: 1px solid var(--line-soft); text-align: left;
+}
+table.cov td {
+  padding: 0; border: 0; border-bottom: 1px solid var(--line-soft);
+  text-align: center; width: 40px;
+}
+table.cov td .cell {
+  display: block; margin: 2px 1px; height: 19px; line-height: 19px;
+  font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums;
+  font-size: 11px; color: var(--ink);
+}
+table.cov td .cell.z { color: var(--line); }
+table.cov tr.catrow th {
+  font-size: 13px; font-weight: 700; color: var(--ink);
+  padding: 16px 0 5px; text-transform: none; letter-spacing: 0;
+  background: none; position: static; border-bottom: 1px solid var(--line);
+  font-family: "IBM Plex Sans", sans-serif;
+}
+
+.cat { border-bottom: 1px solid var(--line); }
+.cat > summary {
+  cursor: pointer; padding: 11px 0; display: flex; align-items: baseline; gap: 10px;
+  font-size: 14px; font-weight: 600; list-style: none;
+}
+.cat > summary::-webkit-details-marker { display: none; }
+.cat > summary::before { content: "+"; color: var(--muted); font-family: "IBM Plex Mono", monospace; }
+.cat[open] > summary::before { content: "\2212"; }
+.cat > summary .sub {
+  font-family: "IBM Plex Mono", monospace; font-size: 11.5px; color: var(--muted);
+  font-weight: 400; margin-left: auto;
+}
+.leaf {
+  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  padding: 7px 0 7px 22px; border-top: 1px solid var(--line-soft);
+}
+.leaf .name { font-size: 13px; font-weight: 500; }
+.leaf .path { font-family: "IBM Plex Mono", monospace; font-size: 11.5px; color: var(--muted); }
+.leaf .count {
+  font-family: "IBM Plex Mono", monospace; font-size: 11.5px; color: var(--muted);
+  margin-left: auto; font-variant-numeric: tabular-nums;
+}
+.leaf.gap .name, .leaf.gap .path, .leaf.gap .count { color: var(--faint); }
+
+@media (max-width: 640px) {
+  .sitenav { margin-left: 0; }
+  .leaf .count { margin-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <h1>Technique Index</h1>
+__NAV__
+  </header>
+
+  <div class="figures" id="figures"></div>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab" role="tab" id="tab-problems" aria-selected="true" aria-controls="panel-problems">Problems</button>
+    <button class="tab" role="tab" id="tab-coverage" aria-selected="false" aria-controls="panel-coverage">Coverage</button>
+    <button class="tab" role="tab" id="tab-taxonomy" aria-selected="false" aria-controls="panel-taxonomy">Taxonomy</button>
+  </nav>
+
+  <section id="panel-problems" role="tabpanel" aria-labelledby="tab-problems">
+    <div class="controls">
+      <div class="field">
+        <label for="q">Search</label>
+        <input type="search" id="q" placeholder="title, id or tag" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="cat">Technique</label>
+        <select id="cat" autocomplete="off"></select>
+      </div>
+      <div class="field">
+        <label for="dmin">Tier</label>
+        <div class="range">
+          <select id="dmin" autocomplete="off"></select><span>to</span><select id="dmax" autocomplete="off"></select>
+        </div>
+      </div>
+      <div class="field">
+        <label for="sort">Sort</label>
+        <select id="sort" autocomplete="off">
+          <option value="difficulty">Tier, easiest first</option>
+          <option value="difficulty-desc">Tier, hardest first</option>
+          <option value="year-desc">Year, newest first</option>
+          <option value="year">Year, oldest first</option>
+          <option value="quality">Quality</option>
+          <option value="title">Title</option>
+          <option value="origin">Judge</option>
+        </select>
+      </div>
+      <div class="field" style="grid-column: 1 / -1;">
+        <label>Judge</label>
+        <div class="chips" id="origins"></div>
+      </div>
+      <div class="field" style="grid-column: 1 / -1;">
+        <label>Filter</label>
+        <div class="chips" id="flags"></div>
+      </div>
+    </div>
+
+    <div class="resultbar">
+      <span><strong id="shown">0</strong> of <strong id="total">0</strong></span>
+      <span class="num dim" id="activefilter"></span>
+      <button class="linkish" id="reset" hidden>Clear</button>
+    </div>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr id="headrow"></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div class="empty" id="noresults" hidden>
+        No problems match.
+        <button class="linkish" id="resetempty" type="button">Clear filters</button>
+      </div>
+      <div class="empty" id="more" hidden></div>
+    </div>
+  </section>
+
+  <section id="panel-coverage" role="tabpanel" aria-labelledby="tab-coverage" hidden>
+    <div class="resultbar"><span class="num dim" id="covnote"></span></div>
+    <div class="covwrap">
+      <table class="cov">
+        <thead><tr><th scope="col" class="rowhead">Technique</th></tr></thead>
+        <tbody id="covrows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="panel-taxonomy" role="tabpanel" aria-labelledby="tab-taxonomy" hidden>
+    <div id="taxrows"></div>
+  </section>
+</div>
+
+<script id="payload" type="application/json">__DATA__</script>
+<script>
+(function () {
+  "use strict";
+  var DATA = JSON.parse(document.getElementById("payload").textContent);
+  var problems = DATA.problems, nodes = DATA.nodes;
+  var SHOW_STATUS = !!DATA.config.status;
+  var leaves = nodes.filter(function (n) { return n.leaf; });
+  var cats = nodes.filter(function (n) { return n.depth === 1; });
+  var PAGE = 300;
+
+  var ORIGIN_NAME = { cses: "CSES", ccc: "CCC", cco: "CCO", ioi: "IOI", usaco: "USACO",
+                      codeforces: "Codeforces", coci: "COCI", boi: "BOI", dmoj: "DMOJ" };
+  function judge(o) { return ORIGIN_NAME[o] || o.toUpperCase(); }
+  function catOf(tag) { return tag.split(".")[0]; }
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  var origins = [];
+  problems.forEach(function (p) { if (origins.indexOf(p.o) < 0) origins.push(p.o); });
+  function countOrigin(o) { return problems.filter(function (p) { return p.o === o; }).length; }
+  origins.sort(function (a, b) { return countOrigin(b) - countOrigin(a); });
+
+  var state = { q: "", cat: "", tag: "", dmin: 1, dmax: 10, origins: [],
+                unsolved: false, canonical: false, precise: false,
+                sort: "difficulty", limit: PAGE };
+
+  var covered = {};
+  problems.forEach(function (p) { p.tg.forEach(function (t) { covered[t] = 1; }); });
+
+  var figures = [
+    ["<b>" + problems.length + "</b>", "problems"],
+    ["<b>" + problems.filter(function (p) { return p.ix; }).length + "</b>", "tagged"],
+    ["<b>" + origins.length + "</b>", "judges"],
+    ["<b>" + Object.keys(covered).length + "</b>/" + leaves.length, "techniques"]
+  ];
+  if (SHOW_STATUS) {
+    figures.push(["<b>" + problems.filter(function (p) { return p.s; }).length + "</b>", "solved"]);
+  }
+  document.getElementById("figures").innerHTML = figures.map(function (f) {
+    return '<span class="figure">' + f[0] + " " + f[1] + "</span>";
+  }).join("");
+  document.getElementById("total").textContent = problems.length;
+
+  var COLUMNS = ["Problem", "Tier", "Teaches", "Quality"];
+  if (SHOW_STATUS) COLUMNS.push("Status");
+  document.getElementById("headrow").innerHTML = COLUMNS.map(function (c) {
+    return '<th scope="col">' + c + "</th>";
+  }).join("");
+
+  // --- controls ------------------------------------------------------------
+  var catSel = document.getElementById("cat");
+  catSel.innerHTML = '<option value="">All</option>' + cats.map(function (c) {
+    var n = problems.filter(function (p) { return p.pt && catOf(p.pt) === c.id; }).length;
+    return '<option value="' + c.id + '">' + esc(c.name) + " (" + n + ")</option>";
+  }).join("");
+
+  var dmin = document.getElementById("dmin"), dmax = document.getElementById("dmax");
+  for (var t = 1; t <= 10; t++) {
+    dmin.insertAdjacentHTML("beforeend", '<option value="' + t + '">' + t + "</option>");
+    dmax.insertAdjacentHTML("beforeend", '<option value="' + t + '">' + t + "</option>");
+  }
+  dmin.value = "1"; dmax.value = "10";
+
+  document.getElementById("origins").innerHTML = origins.map(function (o) {
+    return '<button class="chip" type="button" data-origin="' + o + '" aria-pressed="false">' +
+           esc(judge(o)) + ' <span class="n">' + countOrigin(o) + "</span></button>";
+  }).join("");
+
+  var flags = "";
+  if (SHOW_STATUS) {
+    flags += '<button class="chip" type="button" data-flag="unsolved" aria-pressed="false">Unsolved</button>';
+  }
+  flags += '<button class="chip" type="button" data-flag="precise" aria-pressed="false">Precise tag</button>' +
+           '<button class="chip" type="button" data-flag="canonical" aria-pressed="false">Canonical</button>';
+  document.getElementById("flags").innerHTML = flags;
+
+  // --- filtering -----------------------------------------------------------
+  function matches(p) {
+    var d = parseInt(p.d, 10) || 0;
+    var narrowed = state.dmin > 1 || state.dmax < 10;
+    // A row with no tier is only hidden once the tier filter is actually used.
+    if (narrowed && (d < state.dmin || d > state.dmax)) return false;
+    if (state.precise && p.cz) return false;
+    if (state.cat && (!p.pt || catOf(p.pt) !== state.cat)) return false;
+    if (state.tag && p.tg.indexOf(state.tag) < 0) return false;
+    if (state.origins.length && state.origins.indexOf(p.o) < 0) return false;
+    if (state.unsolved && p.s) return false;
+    if (state.canonical && !p.k) return false;
+    if (state.q) {
+      var hay = (p.t + " " + p.id + " " + p.tg.join(" ") + " " + p.ft.join(" ") + " " + p.c).toLowerCase();
+      if (hay.indexOf(state.q) < 0) return false;
+    }
+    return true;
+  }
+
+  // Every filter except the technique ones, so the count of rows a technique
+  // filter necessarily excludes can be reported.
+  function matchesExceptTechnique(p) {
+    var d = parseInt(p.d, 10) || 0;
+    var narrowed = state.dmin > 1 || state.dmax < 10;
+    if (narrowed && (d < state.dmin || d > state.dmax)) return false;
+    if (state.precise && p.cz) return false;
+    if (state.origins.length && state.origins.indexOf(p.o) < 0) return false;
+    if (state.unsolved && p.s) return false;
+    if (state.canonical && !p.k) return false;
+    if (state.q) {
+      var hay = (p.t + " " + p.id + " " + p.tg.join(" ") + " " + p.ft.join(" ") + " " + p.c).toLowerCase();
+      if (hay.indexOf(state.q) < 0) return false;
+    }
+    return true;
+  }
+
+  function byTitle(a, b) { return a.t.localeCompare(b.t); }
+  var SORTS = {
+    difficulty: function (a, b) { return (+a.d - +b.d) || byTitle(a, b); },
+    "difficulty-desc": function (a, b) { return (+b.d - +a.d) || byTitle(a, b); },
+    year: function (a, b) { return ((+a.y || 0) - (+b.y || 0)) || byTitle(a, b); },
+    "year-desc": function (a, b) { return ((+b.y || 0) - (+a.y || 0)) || byTitle(a, b); },
+    quality: function (a, b) { return ((+b.q || 0) - (+a.q || 0)) || (+a.d - +b.d); },
+    title: byTitle,
+    origin: function (a, b) { return a.o.localeCompare(b.o) || (+a.d - +b.d); }
+  };
+
+  function teaches(p) {
+    if (p.pt) {
+      return '<button class="tagbtn' + (p.cz ? " approx" : "") + '" type="button" ' +
+             'data-tag="' + esc(p.pt) + '" title="' +
+             (p.cz ? "category-level approximation" : "classified") + '">' +
+             (p.cz ? "~" : "") + esc(p.pt) + "</button>";
+    }
+    return '<span class="untagged">' + (p.ft.length ? esc(p.ft.join(", ")) : "—") + "</span>";
+  }
+
+  function rowHtml(p) {
+    var title = p.u
+      ? '<a href="' + esc(p.u) + '" target="_blank" rel="noopener">' + esc(p.t) + "</a>"
+      : esc(p.t);
+    return "<tr>" +
+      '<td class="t-title">' + title +
+        (p.k ? '<span class="canon">canonical</span>' : "") +
+        '<span class="meta">' + esc(p.id) + (p.c ? " · " + esc(p.c) : "") + "</span></td>" +
+      '<td class="num">' + (parseInt(p.d, 10) || "—") + "</td>" +
+      "<td>" + teaches(p) + "</td>" +
+      '<td class="num' + (p.q ? "" : " dim") + '">' + (p.q ? esc(p.q) : "—") + "</td>" +
+      (SHOW_STATUS
+        ? '<td class="status' + (p.s ? " done" : "") + '">' + (p.s ? "solved" : "open") + "</td>"
+        : "") +
+      "</tr>";
+  }
+
+  function render() {
+    var out = problems.filter(matches).sort(SORTS[state.sort]);
+    var page = out.slice(0, state.limit);
+    document.getElementById("rows").innerHTML = page.map(rowHtml).join("");
+    document.getElementById("shown").textContent = out.length;
+    document.getElementById("noresults").hidden = out.length > 0;
+
+    var more = document.getElementById("more");
+    if (out.length > page.length) {
+      more.hidden = false;
+      more.innerHTML = '<button class="linkish" id="showmore">Show ' +
+        Math.min(PAGE, out.length - page.length) + " more of " +
+        (out.length - page.length) + "</button>";
+      document.getElementById("showmore").addEventListener("click", function () {
+        state.limit += PAGE; render();
+      });
+    } else {
+      more.hidden = true;
+    }
+
+    var active = state.q || state.cat || state.tag || state.origins.length ||
+                 state.unsolved || state.canonical || state.precise ||
+                 state.dmin > 1 || state.dmax < 10;
+    document.getElementById("reset").hidden = !active;
+
+    // Filtering by technique can only ever see tagged rows. Say how many the
+    // filter cannot reach, so a thin result reads as missing tags rather than
+    // as missing problems.
+    var note = state.tag || "";
+    if (state.cat || state.tag) {
+      var hidden = problems.filter(function (p) {
+        return !p.pt && matchesExceptTechnique(p);
+      }).length;
+      if (hidden) {
+        note += (note ? "  ·  " : "") + hidden + " untagged, not reachable by technique";
+      }
+    }
+    document.getElementById("activefilter").textContent = note;
+  }
+
+  function refresh() { state.limit = PAGE; render(); }
+
+  // --- events --------------------------------------------------------------
+  document.getElementById("q").addEventListener("input", function (e) {
+    state.q = e.target.value.trim().toLowerCase(); refresh();
+  });
+  catSel.addEventListener("change", function (e) { state.cat = e.target.value; state.tag = ""; refresh(); });
+  dmin.addEventListener("change", function (e) {
+    state.dmin = +e.target.value;
+    if (state.dmin > state.dmax) { state.dmax = state.dmin; dmax.value = e.target.value; }
+    refresh();
+  });
+  dmax.addEventListener("change", function (e) {
+    state.dmax = +e.target.value;
+    if (state.dmax < state.dmin) { state.dmin = state.dmax; dmin.value = e.target.value; }
+    refresh();
+  });
+  document.getElementById("sort").addEventListener("change", function (e) {
+    state.sort = e.target.value; refresh();
+  });
+
+  document.getElementById("origins").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-origin]"); if (!b) return;
+    var o = b.dataset.origin, i = state.origins.indexOf(o);
+    if (i < 0) { state.origins.push(o); } else { state.origins.splice(i, 1); }
+    b.setAttribute("aria-pressed", i < 0 ? "true" : "false");
+    refresh();
+  });
+  document.getElementById("flags").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-flag]"); if (!b) return;
+    var f = b.dataset.flag; state[f] = !state[f];
+    b.setAttribute("aria-pressed", state[f] ? "true" : "false");
+    refresh();
+  });
+  document.getElementById("rows").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-tag]"); if (!b) return;
+    state.tag = b.dataset.tag; state.cat = ""; catSel.value = ""; refresh();
+  });
+  function clearFilters() {
+    state = { q: "", cat: "", tag: "", dmin: 1, dmax: 10, origins: [],
+              unsolved: false, canonical: false, precise: false,
+              sort: state.sort, limit: PAGE };
+    syncControlsToState();
+    render();
+  }
+  document.getElementById("reset").addEventListener("click", clearFilters);
+  // The empty state is a dead end otherwise: give it its own way out.
+  document.getElementById("resetempty").addEventListener("click", clearFilters);
+
+  // --- coverage ------------------------------------------------------------
+  var counts = {}, maxCount = 0;
+  problems.forEach(function (p) {
+    var tier = parseInt(p.d, 10) || 0; if (!tier) return;
+    p.tg.forEach(function (tag) {
+      counts[tag] = counts[tag] || {};
+      counts[tag][tier] = (counts[tag][tier] || 0) + 1;
+      if (counts[tag][tier] > maxCount) maxCount = counts[tag][tier];
+    });
+  });
+  function heat(n) {
+    var a = 0.1 + 0.62 * Math.min(1, n / Math.max(2, maxCount));
+    return "background: rgba(var(--heat), " + a.toFixed(2) + ");" +
+           (a > 0.45 ? "color: var(--inv-ink);" : "");
+  }
+
+  var head = document.querySelector("table.cov thead tr");
+  for (var ti = 1; ti <= 10; ti++) head.insertAdjacentHTML("beforeend", '<th scope="col">' + ti + "</th>");
+
+  var covHtml = [];
+  cats.forEach(function (c) {
+    var mine = leaves.filter(function (l) { return catOf(l.id) === c.id; });
+    if (!mine.length) return;
+    covHtml.push('<tr class="catrow"><th colspan="11" scope="colgroup">' + esc(c.name) + "</th></tr>");
+    mine.forEach(function (l) {
+      var cells = "";
+      for (var k = 1; k <= 10; k++) {
+        var n = (counts[l.id] || {})[k] || 0;
+        cells += "<td>" + (n
+          ? '<span class="cell" style="' + heat(n) + '">' + n + "</span>"
+          : '<span class="cell z">·</span>') + "</td>";
+      }
+      covHtml.push('<tr><th scope="row" class="rowhead">' + esc(l.id) + "</th>" + cells + "</tr>");
+    });
+  });
+  document.getElementById("covrows").innerHTML = covHtml.join("");
+  document.getElementById("covnote").textContent =
+    Object.keys(covered).length + " of " + leaves.length + " leaf tags covered";
+
+  // --- taxonomy ------------------------------------------------------------
+  var tagCount = {};
+  problems.forEach(function (p) {
+    p.tg.forEach(function (t) { tagCount[t] = (tagCount[t] || 0) + 1; });
+  });
+  document.getElementById("taxrows").innerHTML = cats.map(function (c) {
+    var mine = leaves.filter(function (l) { return catOf(l.id) === c.id; });
+    var used = mine.filter(function (l) { return covered[l.id]; }).length;
+    return '<details class="cat"><summary>' + esc(c.name) +
+      '<span class="sub">' + used + "/" + mine.length + "</span></summary>" +
+      mine.map(function (l) {
+        var n = tagCount[l.id] || 0;
+        return '<div class="leaf' + (n ? "" : " gap") + '">' +
+          '<span class="name">' + esc(l.name) + "</span>" +
+          '<span class="path">' + esc(l.id) + "</span>" +
+          '<span class="count">' + (n || "—") + "</span></div>";
+      }).join("") + "</details>";
+  }).join("");
+
+  // --- tabs ----------------------------------------------------------------
+  var TABS = ["problems", "coverage", "taxonomy"];
+  function show(name) {
+    TABS.forEach(function (t) {
+      document.getElementById("tab-" + t).setAttribute("aria-selected", String(t === name));
+      document.getElementById("panel-" + t).hidden = t !== name;
+    });
+    try { localStorage.setItem("cpidx-tab", name); } catch (e) { /* storage may be blocked */ }
+  }
+  TABS.forEach(function (t) {
+    document.getElementById("tab-" + t).addEventListener("click", function () { show(t); });
+  });
+  try {
+    var saved = localStorage.getItem("cpidx-tab");
+    if (saved && TABS.indexOf(saved) >= 0) show(saved);
+  } catch (e) { /* storage may be blocked */ }
+
+  // The browser restores control values across reloads, but it cannot restore
+  // `state`, which lives in this closure. Left alone the two disagree and the
+  // page renders filters the controls do not show. Drive the controls from
+  // state once, at startup, so they always agree.
+  function syncControlsToState() {
+    document.getElementById("q").value = state.q;
+    catSel.value = state.cat;
+    dmin.value = String(state.dmin);
+    dmax.value = String(state.dmax);
+    document.getElementById("sort").value = state.sort;
+    var chips = document.querySelectorAll("#origins [data-origin], #flags [data-flag]");
+    Array.prototype.forEach.call(chips, function (chip) {
+      var on = chip.dataset.origin
+        ? state.origins.indexOf(chip.dataset.origin) >= 0
+        : !!state[chip.dataset.flag];
+      chip.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+  }
+
+  syncControlsToState();
+  render();
+})();
+</script>

@@ -50,3 +50,13 @@ Algorithms/strategies/bst_to_list/tests/test_randomize_array.py
 
 CodeForces/
 CSES/temp.cpp
+
+# personal solve history, SPEC.md 3
+progress.csv
+
+# index build scratch (seed provenance, fetched judge metadata)
+.scratch/
+.coverage
+
+# editable-install metadata
+*.egg-info/
