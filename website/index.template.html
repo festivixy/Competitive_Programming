@@ -375,11 +375,23 @@ __NAV__
   }).join("");
 
   // --- controls ------------------------------------------------------------
+  var UNCLASSIFIED = "adhoc.unclassified";
+  var unclassifiedCount = problems.filter(function (p) { return p.pt === UNCLASSIFIED; }).length;
+
+  // Counted separately: lumping the placeholder into Ad hoc makes that
+  // category look huge and every other one look starved.
   var catSel = document.getElementById("cat");
-  catSel.innerHTML = '<option value="">All</option>' + cats.map(function (c) {
-    var n = problems.filter(function (p) { return p.pt && catOf(p.pt) === c.id; }).length;
-    return '<option value="' + c.id + '">' + esc(c.name) + " (" + n + ")</option>";
-  }).join("");
+  catSel.innerHTML =
+    '<option value="">All</option>' +
+    cats.map(function (c) {
+      var n = problems.filter(function (p) {
+        return p.pt && p.pt !== UNCLASSIFIED && catOf(p.pt) === c.id;
+      }).length;
+      return '<option value="' + c.id + '">' + esc(c.name) + " (" + n + ")</option>";
+    }).join("") +
+    (unclassifiedCount
+      ? '<option value="__unclassified">Unclassified (' + unclassifiedCount + ")</option>"
+      : "");
 
   var dmin = document.getElementById("dmin"), dmax = document.getElementById("dmax");
   for (var t = 1; t <= 10; t++) {
@@ -408,7 +420,11 @@ __NAV__
     // A row with no tier is only hidden once the tier filter is actually used.
     if (narrowed && (d < state.dmin || d > state.dmax)) return false;
     if (state.precise && p.cz) return false;
-    if (state.cat && (!p.pt || catOf(p.pt) !== state.cat)) return false;
+    if (state.cat === "__unclassified") {
+      if (p.pt !== UNCLASSIFIED) return false;
+    } else if (state.cat && (!p.pt || p.pt === UNCLASSIFIED || catOf(p.pt) !== state.cat)) {
+      return false;
+    }
     if (state.tag && p.tg.indexOf(state.tag) < 0) return false;
     if (state.origins.length && state.origins.indexOf(p.o) < 0) return false;
     if (state.unsolved && p.s) return false;
@@ -506,10 +522,10 @@ __NAV__
     var note = state.tag || "";
     if (state.cat || state.tag) {
       var hidden = problems.filter(function (p) {
-        return !p.pt && matchesExceptTechnique(p);
+        return (!p.pt || p.pt === UNCLASSIFIED) && matchesExceptTechnique(p);
       }).length;
-      if (hidden) {
-        note += (note ? "  ·  " : "") + hidden + " untagged, not reachable by technique";
+      if (hidden && state.cat !== "__unclassified") {
+        note += (note ? "  ·  " : "") + hidden + " unclassified, not reachable by technique";
       }
     }
     document.getElementById("activefilter").textContent = note;

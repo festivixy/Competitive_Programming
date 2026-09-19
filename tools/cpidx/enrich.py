@@ -36,6 +36,7 @@ PROVENANCE_DMOJ = "via-dmoj-types"
 PROVENANCES = (
     PROVENANCE_GUIDE,
     PROVENANCE_DMOJ,
+    "via-dmoj-mirror",
     "via-dmoj-category",
     "via-usaco-analysis",
     "via-solution-code",
@@ -237,6 +238,73 @@ DMOJ_TYPE_TAGS = {
 
 
 PROVENANCE_COARSE = "via-dmoj-category"
+PROVENANCE_MIRROR = "via-dmoj-mirror"
+UNCLASSIFIED = "adhoc.unclassified"
+
+# DMOJ mirrors many of the olympiads oj.uz hosts, and unlike oj.uz it
+# categorises them. Matching is by title, because the two sites' problem codes
+# share nothing.
+MIRROR_PREFIX = [
+    ("coci", "coci"),
+    ("joi", "joi"),
+    ("ioi", "ioi"),
+    ("ceoi", "ceoi"),
+    ("apio", "apio"),
+    ("egoi", "egoi"),
+    ("izho", "izho"),
+    ("poi", "poi"),
+    ("inoi", "inoi"),
+    ("boi", "boi"),
+    ("balkanoi", "balkan"),
+    ("koi", "koi"),
+    ("rmi", "rmi"),
+    ("cco", "cco"),
+    ("ccc", "ccc"),
+]
+
+
+def _norm_title(text: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", text.lower())
+
+
+def _title_candidates(name: str) -> set[str]:
+    """The ways a DMOJ problem name can spell the bare title.
+
+    Names come as "IOI '11 - Garden" but also "COCI '14 Contest 1 #4 Mafija",
+    so both the dash and the numbering have to be stripped.
+    """
+    out = {name}
+    if " - " in name:
+        out.add(name.split(" - ")[-1])
+    out.add(re.sub(r"^.*#\s*\d+\s*", "", name))
+    out.add(re.sub(r"^[^']*'\d{2}\s*", "", name))
+    return {_norm_title(c) for c in out if c.strip()}
+
+
+def mirror_index(problems: list[dict]) -> tuple[dict, dict]:
+    """(by (origin, title), by title alone) over DMOJ's mirrored problems."""
+    scoped: dict[tuple[str, str], dict] = {}
+    loose: dict[str, list[dict]] = {}
+    for obj in problems:
+        code = obj.get("code", "")
+        origin = next((o for o, pref in MIRROR_PREFIX if code.startswith(pref)), None)
+        for title in _title_candidates(obj.get("name", "")):
+            if origin:
+                scoped.setdefault((origin, title), obj)
+            loose.setdefault(title, []).append(obj)
+    # A bare title is only usable when it identifies one problem.
+    return scoped, {t: v[0] for t, v in loose.items() if len(v) == 1}
+
+
+def mirror_types_for(row: dict, scoped: dict, loose: dict) -> list[str]:
+    title = _norm_title(row.get("title", ""))
+    if not title:
+        return []
+    obj = scoped.get((row.get("origin", ""), title)) or loose.get(title)
+    if not obj:
+        return []
+    return [str(t).lower().replace(" ", "-") for t in obj.get("types") or ()]
+
 
 # Coarse fallback, applied only by `enrich --coarse` and only to rows nothing
 # else resolved. Each category names a whole subtree, so these collapse it to
@@ -289,6 +357,36 @@ COARSE_PRIORITY = [
     "simulation",
     "implementation",
 ]
+
+# CSES publishes no categories, but its section headings carry real signal --
+# "Sliding Window Problems" and "Interactive Problems" name a technique
+# outright, and the rest at least name a subtree.
+CSES_SECTION_TAGS = {
+    "Sliding Window Problems": "data_structures.linear.sliding_window",
+    "Interactive Problems": "adhoc.constructive.interactive",
+    "Construction Problems": "adhoc.constructive.construction",
+    "Range Queries": "data_structures.range_query.segment_tree",
+    "Tree Algorithms": "trees.basics.traversal",
+    "Graph Algorithms": "graphs.traversal.dfs",
+    "Advanced Graph Problems": "graphs.traversal.dfs",
+    "Dynamic Programming": "dp.basics.linear",
+    "String Algorithms": "strings.matching.kmp",
+    "Mathematics": "math.algebra.modular_arithmetic",
+    "Geometry": "geometry.primitives.points",
+    "Sorting and Searching": "adhoc.simulation.sorting",
+    "Bitwise Operations": "bitwise.basics.operators",
+    "Counting Problems": "combinatorics.basics.binomials",
+    "Introductory Problems": "adhoc.simulation.direct",
+}
+
+
+def cses_section_tag_for(row: dict) -> str | None:
+    """The leaf a CSES section heading implies, from the contest column."""
+    contest = row.get("contest", "")
+    if " - " not in contest:
+        return None
+    return CSES_SECTION_TAGS.get(contest.split(" - ", 1)[1].strip())
+
 
 # Rows with no category at all. Mis-labelling these as simulation would be a
 # claim; `unclassified` states the actual situation and stays countable.
@@ -408,7 +506,10 @@ def dmoj_tag_for(row: dict) -> str | None:
 
 
 def apply(
-    rows: list[dict], guide: dict[str, dict], coarse: bool = False
+    rows: list[dict],
+    guide: dict[str, dict],
+    coarse: bool = False,
+    mirrors: tuple[dict, dict] | None = None,
 ) -> tuple[list[dict], dict[str, int]]:
     """Fill blank tags from the available sources. Never overwrites a tag.
 
@@ -416,12 +517,15 @@ def apply(
     representative leaf for its broadest category. See COARSE_CATEGORY_TAGS
     for what that does and does not mean.
     """
-    stats = {"guide": 0, "dmoj": 0, "coarse": 0, "already": 0, "unresolved": 0}
+    stats = {"guide": 0, "dmoj": 0, "mirror": 0, "coarse": 0, "already": 0, "unresolved": 0}
     alt = guide_alt_index(guide)
+    scoped, loose = mirrors or ({}, {})
     out = []
     for row in rows:
         row = dict(row)
-        if row.get("primary_tag"):
+        # `unclassified` is a placeholder, not a decision: let a real source
+        # replace it whenever one turns up.
+        if row.get("primary_tag") and row["primary_tag"] != UNCLASSIFIED:
             stats["already"] += 1
             out.append(row)
             continue
@@ -436,9 +540,25 @@ def apply(
         if not tag:
             tag = dmoj_tag_for(row)
             source = PROVENANCE_DMOJ
+        mirror_types: list[str] = []
+        if not tag and (scoped or loose):
+            mirror_types = mirror_types_for(row, scoped, loose)
+            if len(mirror_types) == 1:
+                tag = DMOJ_TYPE_TAGS.get(mirror_types[0])
+            if tag:
+                source = PROVENANCE_MIRROR
         if not tag and coarse:
-            tag = coarse_tag_for(row)
-            source = PROVENANCE_COARSE
+            # A mirror's categories beat no categories at all.
+            if mirror_types:
+                merged = dict(row)
+                merged["free_tags"] = csvio.join_list(mirror_types)
+                tag = coarse_tag_for(merged)
+                source = PROVENANCE_MIRROR
+            else:
+                tag = cses_section_tag_for(row)
+                source = PROVENANCE_COARSE
+                if not tag:
+                    tag = coarse_tag_for(row)
         if not tag:
             stats["unresolved"] += 1
             out.append(row)
@@ -448,7 +568,13 @@ def apply(
         row["tags"] = tag
         free = [f for f in csvio.split_list(row.get("free_tags", "")) if f not in PROVENANCES]
         row["free_tags"] = csvio.join_list([*free, source])
-        stats[{PROVENANCE_GUIDE: "guide", PROVENANCE_DMOJ: "dmoj"}.get(source, "coarse")] += 1
+        stats[
+            {
+                PROVENANCE_GUIDE: "guide",
+                PROVENANCE_DMOJ: "dmoj",
+                PROVENANCE_MIRROR: "mirror",
+            }.get(source, "coarse")
+        ] += 1
         out.append(row)
     return out, stats
 
@@ -456,7 +582,13 @@ def apply(
 def unknown_tags(taxonomy) -> list[str]:
     """Mapped tags that are not leaves of the current taxonomy."""
     bad = []
-    for table in (GUIDE_MODULE_TAGS, GUIDE_TAG_TAGS, DMOJ_TYPE_TAGS, COARSE_CATEGORY_TAGS):
+    for table in (
+        GUIDE_MODULE_TAGS,
+        GUIDE_TAG_TAGS,
+        DMOJ_TYPE_TAGS,
+        COARSE_CATEGORY_TAGS,
+        CSES_SECTION_TAGS,
+    ):
         for tag in sorted(set(table.values())):
             if not taxonomy.is_leaf(tag):
                 bad.append(tag)

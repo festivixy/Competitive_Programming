@@ -193,3 +193,67 @@ def test_uncategorised_rows_are_marked_unclassified_not_simulation(
     out, _ = enrich.apply([row(id="a", free_tags="")], {}, coarse=True)
     assert out[0]["primary_tag"] == "adhoc.unclassified"
     assert real_taxonomy.is_leaf("adhoc.unclassified")
+
+
+# --- DMOJ mirrors and CSES sections -------------------------------------------
+MIRROR_DMOJ = [
+    {"code": "coci14c1p4", "name": "COCI '14 Contest 1 #4 Mafija", "types": ["Graph Theory"]},
+    {"code": "ioi11p3", "name": "IOI '11 - Garden", "types": ["Implementation"]},
+]
+
+
+def test_mirror_titles_survive_both_dmoj_naming_styles() -> None:
+    scoped, loose = enrich.mirror_index(MIRROR_DMOJ)
+    assert enrich.mirror_types_for(
+        csvio.blank_problem(id="a", origin="coci", title="Mafija"), scoped, loose
+    ) == ["graph-theory"]
+    assert enrich.mirror_types_for(
+        csvio.blank_problem(id="b", origin="ioi", title="Garden"), scoped, loose
+    ) == ["implementation"]
+
+
+def test_mirror_supplies_a_precise_tag_when_the_category_is_unambiguous() -> None:
+    mirrors = enrich.mirror_index(MIRROR_DMOJ)
+    rows = [csvio.blank_problem(id="b", origin="ioi", title="Garden")]
+    out, stats = enrich.apply(rows, {}, mirrors=mirrors)
+    assert out[0]["primary_tag"] == "adhoc.simulation.direct"
+    assert stats["mirror"] == 1
+
+
+def test_unclassified_is_upgraded_when_a_source_appears() -> None:
+    """The placeholder is not a decision, so it must not block a real tag."""
+    rows = [
+        csvio.blank_problem(
+            id="b",
+            origin="ioi",
+            title="Garden",
+            primary_tag=enrich.UNCLASSIFIED,
+            tags=enrich.UNCLASSIFIED,
+        )
+    ]
+    out, _ = enrich.apply(rows, {}, mirrors=enrich.mirror_index(MIRROR_DMOJ))
+    assert out[0]["primary_tag"] != enrich.UNCLASSIFIED
+
+
+def test_a_real_tag_is_still_never_overwritten() -> None:
+    rows = [
+        csvio.blank_problem(
+            id="b",
+            origin="ioi",
+            title="Garden",
+            primary_tag="dp.basics.knapsack",
+            tags="dp.basics.knapsack",
+        )
+    ]
+    out, stats = enrich.apply(rows, {}, mirrors=enrich.mirror_index(MIRROR_DMOJ))
+    assert out[0]["primary_tag"] == "dp.basics.knapsack"
+    assert stats["already"] == 1
+
+
+def test_cses_section_headings_resolve() -> None:
+    row = csvio.blank_problem(
+        id="cses-1", origin="cses", contest="CSES Problem Set - Sliding Window Problems"
+    )
+    assert enrich.cses_section_tag_for(row) == "data_structures.linear.sliding_window"
+    out, _ = enrich.apply([row], {}, coarse=True)
+    assert out[0]["primary_tag"] == "data_structures.linear.sliding_window"

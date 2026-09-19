@@ -332,11 +332,14 @@ def cmd_enrich(args: argparse.Namespace, paths: Paths) -> int:
     if bad:
         print("error: mapping points at non-leaf tags: " + ", ".join(bad), file=sys.stderr)
         return 2
-    if not os.path.exists(paths.catalogue):
-        print(f"error: {paths.catalogue} does not exist; run `cpidx fetch` first", file=sys.stderr)
+    # `--index` re-runs over problems.csv instead, which is where rows live
+    # once promoted; only `adhoc.unclassified` placeholders can change.
+    target = paths.problems if args.index else paths.catalogue
+    if not os.path.exists(target):
+        print(f"error: {target} does not exist; run `cpidx fetch` first", file=sys.stderr)
         return 2
 
-    _, rows, _ = csvio.read_problems(paths.catalogue)
+    _, rows, _ = csvio.read_problems(target)
     guide: dict[str, str] = {}
     if not args.no_guide:
         print("fetching usaco.guide classifications...")
@@ -347,15 +350,31 @@ def cmd_enrich(args: argparse.Namespace, paths: Paths) -> int:
             return 2
         print(f"  {len(guide)} classified problems")
 
-    tagged, stats = enrich.apply(rows, guide, coarse=args.coarse)
-    csvio.write_problems(paths.catalogue, tagged)
-    print(f"\n{stats['guide']} tagged from usaco.guide, {stats['dmoj']} from DMOJ categories")
+    mirrors = None
+    if not args.no_mirrors:
+        print("fetching DMOJ's mirrored olympiad problems...")
+        try:
+            mirrors = enrich.mirror_index(fetch.dmoj_problems())
+            print(f"  {len(mirrors[0])} scoped titles, {len(mirrors[1])} unique titles")
+        except Exception as exc:  # noqa: BLE001 - network failure is the message
+            print(f"  DMOJ unreachable, skipping mirrors: {exc}")
+
+    tagged, stats = enrich.apply(rows, guide, coarse=args.coarse, mirrors=mirrors)
+    csvio.write_problems(target, tagged)
+    print(
+        f"\n{stats['guide']} from usaco.guide, {stats['dmoj']} from DMOJ categories, "
+        f"{stats['mirror']} from DMOJ mirrors, {stats['coarse']} by coarse fallback"
+    )
     print(f"  {stats['already']} already tagged, {stats['unresolved']} still unresolved")
     print(
         "\nEvery adopted tag records its source in free_tags, so it can be "
         "audited or reverted. Rows left blank are ones no published source "
         "resolves to a single leaf."
     )
+    if args.index:
+        upgraded = stats["guide"] + stats["dmoj"] + stats["mirror"] + stats["coarse"]
+        print(f"\nupgraded {upgraded} placeholder row(s) in {paths.problems}")
+        return 0
     if args.promote:
         return _promote_catalogue(paths, tagged)
     print(f"\nRun with --promote to move tagged rows into {paths.problems}.")
@@ -513,6 +532,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "--no-guide", action="store_true", help="skip usaco.guide; use DMOJ categories only"
+    )
+    p.add_argument(
+        "--index",
+        action="store_true",
+        help="re-tag adhoc.unclassified rows already in problems.csv",
+    )
+    p.add_argument(
+        "--no-mirrors", action="store_true", help="skip DMOJ's mirrored-problem categories"
     )
     p.add_argument(
         "--coarse",
